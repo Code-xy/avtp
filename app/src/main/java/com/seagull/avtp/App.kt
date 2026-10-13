@@ -3,7 +3,7 @@ package com.seagull.avtp
 import android.app.Application
 import android.webkit.CookieManager
 import com.shuyu.gsyvideoplayer.player.PlayerFactory
-import com.shuyu.gsyvideoplayer.player.Exo2PlayerManager
+import tv.danmaku.ijk.media.exo2.Exo2PlayerManager
 
 class App : Application() {
     override fun onCreate() {
