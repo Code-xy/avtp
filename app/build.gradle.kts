@@ -95,6 +95,13 @@ android {
             "META-INF/NOTICE*",
             "META-INF/*.kotlin_module"
         )
+        // GSY 的 ex_so 会塞进 IJK 播放器的 native 库（四架构约 40MB），
+        // 我们用 Exo2 内核，不会加载它们。
+        jniLibs.excludes += setOf(
+            "**/libijkffmpeg.so",
+            "**/libijkplayer.so",
+            "**/libijksdl.so"
+        )
     }
 
     lint { abortOnError = false }
@@ -116,4 +123,8 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer-dash:$media3")
     implementation("androidx.media3:media3-ui:$media3")
     implementation("androidx.media3:media3-datasource-okhttp:$media3")
+
+    // 播放器：GSYVideoPlayer（Exo2 内核）—— 自带手势音量/亮度/进度、倍速、横屏全屏、
+    // 缓存、内核切换；比裸 PlayerView 好用得多。
+    implementation("com.github.CarGuo.GSYVideoPlayer:gsyvideoplayer:14.0.0")
 }

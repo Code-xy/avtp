@@ -169,6 +169,7 @@ class BrowseActivity : AppCompatActivity() {
             Intent(this, PlayerActivity::class.java)
                 .putExtra(PlayerActivity.EXTRA_VIDEO_URL, item.pageUrl)
                 .putExtra(PlayerActivity.EXTRA_TITLE, item.title)
+                .putExtra(PlayerActivity.EXTRA_ALBUM_ID, item.albumId)
                 .putExtra(PlayerActivity.EXTRA_LINE_INDEX, 0)
         )
     }

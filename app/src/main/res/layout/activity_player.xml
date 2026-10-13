@@ -1,41 +1,82 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#000000">
 
-    <!-- WebView 探针挂载点：放在最底层、全屏大小。
-         必须给足尺寸 —— 1x1 的 WebView 会让部分播放器页的 JS 布局/检测失效，
-         页面被上层的 PlayerView 完全盖住，用户看不到。 -->
+    <!-- WebView 抓流探针：垫在最底层，被上面的播放器盖住。
+         必须给足尺寸 —— 1x1 会让部分播放器页的 JS 布局/检测失效。 -->
     <FrameLayout
         android:id="@+id/probeHost"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <androidx.media3.ui.PlayerView
-        android:id="@+id/playerView"
+    <com.shuyu.gsyvideoplayer.video.StandardGSYVideoPlayer
+        android:id="@+id/player"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="#FF000000"
-        app:use_controller="true"
-        app:show_buffering="when_playing"
-        app:resize_mode="fit" />
+        android:layout_height="match_parent" />
 
-    <TextView
-        android:id="@+id/titleText"
+    <ProgressBar
+        android:id="@+id/bar"
+        style="?android:attr/progressBarStyleHorizontal"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="3dp"
         android:layout_gravity="top"
-        android:ellipsize="end"
-        android:maxLines="1"
-        android:paddingLeft="16dp"
-        android:paddingTop="14dp"
-        android:paddingRight="16dp"
-        android:paddingBottom="14dp"
-        android:textColor="#FFFFFF"
-        android:textSize="14sp" />
+        android:indeterminate="true"
+        android:indeterminateTint="#4DA3FF"
+        android:visibility="gone" />
 
+    <!-- 顶部操作条：选集 / 上一集 / 下一集 -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="36dp"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="10dp"
+        android:background="#B316171B"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingLeft="6dp"
+        android:paddingRight="6dp">
+
+        <Button
+            android:id="@+id/btnPrev"
+            android:layout_width="wrap_content"
+            android:layout_height="30dp"
+            android:background="#00000000"
+            android:minWidth="0dp"
+            android:paddingLeft="8dp"
+            android:paddingRight="8dp"
+            android:text="上一集"
+            android:textColor="#E8E8E8"
+            android:textSize="11sp" />
+
+        <Button
+            android:id="@+id/btnNext"
+            android:layout_width="wrap_content"
+            android:layout_height="30dp"
+            android:background="#00000000"
+            android:minWidth="0dp"
+            android:paddingLeft="8dp"
+            android:paddingRight="8dp"
+            android:text="下一集"
+            android:textColor="#E8E8E8"
+            android:textSize="11sp" />
+
+        <Button
+            android:id="@+id/btnEps"
+            android:layout_width="wrap_content"
+            android:layout_height="30dp"
+            android:background="#00000000"
+            android:minWidth="0dp"
+            android:paddingLeft="8dp"
+            android:paddingRight="8dp"
+            android:text="选集"
+            android:textColor="#4DA3FF"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <!-- 加载/状态 -->
     <LinearLayout
         android:id="@+id/loading"
         android:layout_width="wrap_content"
@@ -60,6 +101,44 @@
             android:textSize="13sp" />
     </LinearLayout>
 
+    <!-- 选集面板 -->
+    <LinearLayout
+        android:id="@+id/epsPanel"
+        android:layout_width="match_parent"
+        android:layout_height="260dp"
+        android:layout_gravity="bottom"
+        android:background="#F216171B"
+        android:orientation="vertical"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/epsTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingLeft="14dp"
+            android:paddingRight="14dp"
+            android:paddingBottom="6dp"
+            android:text="选集"
+            android:textColor="#8A8A8E"
+            android:textSize="11sp" />
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <LinearLayout
+                android:id="@+id/epsList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingLeft="10dp"
+                android:paddingRight="10dp" />
+        </ScrollView>
+    </LinearLayout>
+
+    <!-- 线路面板 -->
     <LinearLayout
         android:id="@+id/linePanel"
         android:layout_width="248dp"

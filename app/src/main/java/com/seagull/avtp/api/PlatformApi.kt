@@ -12,7 +12,15 @@ data class Item(
     val title: String,
     val cover: String,
     val pageUrl: String,
-    val extra: String = "",
+    /** 有专辑 id 才能拉选集列表（爱奇艺） */
+    val albumId: String = "",
+)
+
+/** 一集 */
+data class Episode(
+    val order: Int,
+    val name: String,
+    val url: String,
 )
 
 /** 筛选组（频道 / 类型 / 地区 / 年份） */
@@ -69,7 +77,7 @@ object PlatformApi {
             val title = o.optString("name").ifBlank { o.optString("title") }
             val url = o.optString("playUrl")
             if (title.isBlank() || url.isBlank()) continue
-            out.add(Item(title, o.optString("imageUrl"), url))
+            out.add(Item(title, o.optString("imageUrl"), url, o.optString("albumId")))
         }
         return out
     }
@@ -100,7 +108,7 @@ object PlatformApi {
                     if (vid.isNotBlank()) url = "https://www.iqiyi.com/v_$vid.html"
                 }
                 if (title.isNotBlank() && url.isNotBlank()) {
-                    out.add(Item(title, firstImage(a.optString("albumVImage")), url))
+                    out.add(Item(title, firstImage(a.optString("albumVImage")), url, a.optString("albumId")))
                     continue
                 }
             }
@@ -181,6 +189,52 @@ object PlatformApi {
             }
         }
         return ""
+    }
+
+    // ── 选集 ───────────────────────────────────────────────────────────
+
+    /**
+     * 爱奇艺选集
+     * https://pcw-api.iqiyi.com/albums/album/avlistinfo?aid=<albumId>&page=1&size=100
+     * → data.epsodelist[]：order / name / playUrl(v_xxx.html) / vid / duration
+     */
+    fun iqiyiEpisodes(albumId: String): List<Episode> {
+        if (albumId.isBlank() || albumId == "0") return emptyList()
+        val u = "https://pcw-api.iqiyi.com/albums/album/avlistinfo?aid=$albumId&page=1&size=100"
+        val body = get(u, "https://www.iqiyi.com/") ?: return emptyList()
+        val arr = runCatching {
+            JSONObject(body).getJSONObject("data").getJSONArray("epsodelist")
+        }.getOrNull() ?: return emptyList()
+
+        val out = ArrayList<Episode>(arr.length())
+        for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i) ?: continue
+            val url = o.optString("playUrl")
+            if (url.isBlank()) continue
+            val order = o.optInt("order", i + 1)
+            val name = o.optString("shortTitle").ifBlank {
+                o.optString("name").ifBlank { "第${order}集" }
+            }
+            out.add(Episode(order, name, url))
+        }
+        return out.sortedBy { it.order }
+    }
+
+    /** 腾讯选集：float_vinfo2 的 c.video_ids[] 就是分集 vid 序列 */
+    fun tencentEpisodes(cid: String): List<Episode> {
+        if (cid.isBlank()) return emptyList()
+        val body = get("https://node.video.qq.com/x/api/float_vinfo2?cid=$cid", "https://v.qq.com/")
+            ?: return emptyList()
+        val arr = runCatching {
+            JSONObject(body).getJSONObject("c").getJSONArray("video_ids")
+        }.getOrNull() ?: return emptyList()
+        val out = ArrayList<Episode>()
+        for (i in 0 until arr.length()) {
+            val vid = arr.optString(i)
+            if (vid.isBlank()) continue
+            out.add(Episode(i + 1, "第${i + 1}集", "https://v.qq.com/x/page/$vid.html"))
+        }
+        return out
     }
 
     // ── 腾讯（待接）────────────────────────────────────────────────────

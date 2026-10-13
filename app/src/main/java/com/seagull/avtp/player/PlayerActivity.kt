@@ -4,49 +4,57 @@ import android.os.Bundle
 import android.util.Log
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Button
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.media3.common.MediaItem
-import androidx.media3.common.MimeTypes
-import androidx.media3.common.PlaybackException
-import androidx.media3.common.Player
-import androidx.media3.datasource.okhttp.OkHttpDataSource
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import com.seagull.avtp.api.Episode
+import com.seagull.avtp.api.PlatformApi
 import com.seagull.avtp.databinding.ActivityPlayerBinding
 import com.seagull.avtp.parse.Http
 import com.seagull.avtp.parse.Line
 import com.seagull.avtp.parse.LinePool
 import com.seagull.avtp.parse.WebViewProbe
+import com.shuyu.gsyvideoplayer.utils.OrientationUtils
 import okhttp3.Request
 import java.util.concurrent.TimeUnit
 
 /**
- * 播放页：原生 ExoPlayer + 右下角线路浮层。
+ * 播放页：GSYVideoPlayer（Exo2 内核，自带手势音量/亮度/进度、倍速、横屏全屏）
+ *        + 右下角线路切换 + 顶部选集。
  *
- * 切换线路的原则是「无感」：先解析出新流，再 setMediaItem 并 seekTo 到切之前的进度。
- * 所以切换时不能 release 播放器黑屏，只能换 media source。
+ * 取流仍然是「WebView 探针嗅 m3u8 → 流预检找对 Referer → 交给播放器」。
  */
 class PlayerActivity : AppCompatActivity() {
 
     private lateinit var b: ActivityPlayerBinding
-    private var player: ExoPlayer? = null
     private var probe: WebViewProbe? = null
+    private var orientationUtils: OrientationUtils? = null
 
     private var videoUrl = ""
     private var title = ""
+    private var albumId = ""
     private var lineIndex = 0
     private var resumeMs = 0L
-    private var panelOpen = false
-    private var curReferer: String? = null
+    private var linePanelOpen = false
+    private var autoSwitchOn = true
 
     private val lineStatus = HashMap<String, String>()
     private val tried = LinkedHashSet<String>()
     private val retried = HashSet<String>()
-    private val autoSwitchOn = true
-
     private val lines: List<Line> get() = LinePool.DEFAULT
+
+    // 选集
+    private var episodes: List<Episode> = emptyList()
+    private var epIndex = -1
+
+    private val aliveClient by lazy {
+        Http.client.newBuilder()
+            .connectTimeout(6, TimeUnit.SECONDS)
+            .readTimeout(6, TimeUnit.SECONDS)
+            .build()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -55,25 +63,70 @@ class PlayerActivity : AppCompatActivity() {
 
         videoUrl = intent.getStringExtra(EXTRA_VIDEO_URL).orEmpty()
         title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
+        albumId = intent.getStringExtra(EXTRA_ALBUM_ID).orEmpty()
         lineIndex = intent.getIntExtra(EXTRA_LINE_INDEX, 0).coerceIn(0, lines.lastIndex)
+        if (videoUrl.isBlank()) { finish(); return }
 
-        if (videoUrl.isBlank()) {
-            finish()
-            return
-        }
-        b.titleText.text = title.ifBlank { "解析播放" }
-        b.btnLines.setOnClickListener { togglePanel() }
+        setupPlayer()
+        b.btnLines.setOnClickListener { toggleLinePanel() }
+        b.btnEps.setOnClickListener { toggleEpsPanel() }
+        b.btnPrev.setOnClickListener { gotoEpisode(epIndex - 1) }
+        b.btnNext.setOnClickListener { gotoEpisode(epIndex + 1) }
         renderPanel()
-        startResolve()
+        loadEpisodes()
+        startResolve("首次")
+    }
+
+    // ── 播放器 ──────────────────────────────────────────────────────────
+
+    private fun setupPlayer() {
+        b.player.setIsTouchWiget(true)
+        b.player.setIsTouchWigetFull(true)
+        b.player.setDismissControlTime(3000)
+        b.player.setShowFullAnimation(true)
+        b.player.setRotateViewAuto(false)
+        b.player.setLockLand(false)
+        b.player.getTitleTextView().text = title
+
+        orientationUtils = OrientationUtils(this, b.player).apply { setEnable(true) }
+        b.player.getFullscreenButton()?.setOnClickListener { orientationUtils?.resolveByClick() }
+        b.player.getBackButton()?.setOnClickListener { handleBack() }
+    }
+
+    private fun handleBack() {
+        if ((orientationUtils?.getIsLand() ?: 0) > 0) orientationUtils?.backToProtVideo() else finish()
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() = handleBack()
+
+    /**
+     * 交给 GSY 播。
+     * ★ 解析线路给的流地址常常没有 .m3u8 后缀（形如 /global?...&type=playlist），
+     *   播放器光看 URI 推断不出类型，必须显式告诉它这是 HLS。
+     */
+    private fun gsyPlay(stream: String, referer: String) {
+        val p = b.player
+        runCatching { p.release() }
+        p.setMapHeadData(hashMapOf("Referer" to referer, "User-Agent" to Http.UA))
+        if (!stream.lowercase().contains(".m3u8") && !stream.lowercase().contains(".mp4")) {
+            runCatching { p.setOverrideExtension("m3u8") }
+        } else {
+            runCatching { p.setOverrideExtension(null) }
+        }
+        p.setUp(stream, false, null, title)
+        p.startPlayLogic()
+        if (resumeMs > 0) runCatching { p.seekTo(resumeMs) }
+        b.loading.visibility = View.GONE
     }
 
     // ── 取流 ────────────────────────────────────────────────────────────
 
-    private fun startResolve(reason: String = "首次") {
+    private fun startResolve(reason: String) {
         probe?.destroy()
         val line = lines[lineIndex]
         tried.add(line.name)
-        Log.i(TAG, "resolve[$reason] line=${line.name} tried=${tried}")
+        Log.i(TAG, "resolve[$reason] line=${line.name} tried=$tried")
         setStatus(line.name, "解析中…")
         b.loading.visibility = View.VISIBLE
         b.statusText.text = "正在解析：${line.name}"
@@ -83,9 +136,7 @@ class PlayerActivity : AppCompatActivity() {
             onFail = { r -> runOnUiThread { onResolveFail(r, line) } },
             onProgress = { stage ->
                 runOnUiThread {
-                    if (b.loading.visibility == View.VISIBLE) {
-                        b.statusText.text = "${line.name} · $stage"
-                    }
+                    if (b.loading.visibility == View.VISIBLE) b.statusText.text = "${line.name} · $stage"
                 }
             },
         )
@@ -100,28 +151,28 @@ class PlayerActivity : AppCompatActivity() {
             val working = pickReferer(stream, line)
             runOnUiThread {
                 if (working == null) {
-                    Log.w(TAG, "预检失败[${line.name}]：所有 Referer 都拿不到 #EXTM3U")
+                    Log.w(TAG, "预检失败[${line.name}]")
                     setStatus(line.name, "流不可播")
                     b.loading.visibility = View.VISIBLE
-                    b.statusText.text = "${line.name}：流地址拿回来了但拉不到播放列表"
+                    b.statusText.text = "${line.name}：流拿回来了但拉不到播放列表"
                     if (autoSwitchOn) nextUntriedLine("预检失败")
                 } else {
                     Log.i(TAG, "预检通过[${line.name}] referer='$working'")
                     setStatus(line.name, "可用")
-                    play(stream, line, working)
+                    gsyPlay(stream, working)
                 }
             }
         }.start()
     }
 
-    /** 逐个候选 Referer 试拉 m3u8，返回第一个能返回 #EXTM3U 的 */
+    /** 各线路对 Referer 的要求不一样，逐个试，谁能拉到 #EXTM3U 就用谁 */
     private fun pickReferer(stream: String, line: Line): String? {
-        val candidates = LinkedHashSet<String>()
-        candidates.add(line.referer)
-        candidates.add("")
-        platformOrigin()?.let { candidates.add(it) }
-        candidates.add("https://jx.202617.xyz/")
-        for (r in candidates) {
+        val cands = LinkedHashSet<String>()
+        cands.add(line.referer)
+        cands.add("")
+        platformOrigin()?.let { cands.add(it) }
+        cands.add("https://jx.202617.xyz/")
+        for (r in cands) {
             val ok = loadsPlaylist(stream, r)
             Log.i(TAG, "  预检 referer='$r' -> $ok")
             if (ok) return r
@@ -129,144 +180,37 @@ class PlayerActivity : AppCompatActivity() {
         return null
     }
 
-    /** 预检用短超时客户端 —— 不能让几个候选 Referer 把 40s 探针超时耗穿 */
-    private val aliveClient by lazy {
-        Http.client.newBuilder()
-            .connectTimeout(6, TimeUnit.SECONDS)
-            .readTimeout(6, TimeUnit.SECONDS)
-            .build()
-    }
-
     private fun loadsPlaylist(url: String, referer: String): Boolean = try {
         val rb = Request.Builder().url(url).header("User-Agent", Http.UA)
         if (referer.isNotBlank()) rb.header("Referer", referer)
         aliveClient.newCall(rb.build()).execute().use { resp ->
-            if (resp.isSuccessful) {
-                resp.body?.string().orEmpty().trimStart().startsWith("#EXTM3U")
-            } else {
-                Log.i(TAG, "  预检 HTTP ${resp.code}")
-                false
-            }
+            if (resp.isSuccessful) resp.body?.string().orEmpty().trimStart().startsWith("#EXTM3U")
+            else false
         }
     } catch (e: Exception) {
-        Log.i(TAG, "  预检异常 ${e.message}")
         false
     }
 
-    /** 原视频站的 origin，有些线路认这个做防盗链 */
     private fun platformOrigin(): String? = runCatching {
         val h = java.net.URI(videoUrl).host ?: return@runCatching null
         "https://$h/"
     }.getOrNull()
 
-    private fun play(stream: String, line: Line, referer: String) {
-        val p = ensurePlayer(referer)
-        // ★ 关键：解析线路给的流地址大多没有 .m3u8 后缀（形如 /global?...&type=playlist），
-        //   ExoPlayer 光看 URI 推断不出类型，会当成普通视频文件用 ProgressiveMediaSource 打开，
-        //   报 UnrecognizedInputFormatException。必须显式指定 MIME。
-        val item = MediaItem.Builder()
-            .setUri(stream)
-            .setMimeType(mimeFor(stream))
-            .build()
-        p.setMediaItem(item)
-        p.seekTo(resumeMs)
-        p.prepare()
-        p.playWhenReady = true
-        b.loading.visibility = View.GONE
-        renderPanel()
-        // 流地址已到 ExoPlayer 手里，探针立刻退场（cookie 在全局 CookieManager 里，不会丢）
-        probe?.destroy()
-        probe = null
-    }
-
     private fun onResolveFail(reason: String, line: Line) {
         setStatus(line.name, "失效")
-        b.statusText.text = "${line.name}：$reason"
         b.loading.visibility = View.VISIBLE
+        b.statusText.text = "${line.name}：$reason"
         probe?.destroy()
         probe = null
         if (autoSwitchOn) nextUntriedLine("探针失败")
     }
 
-    private fun mimeFor(url: String): String {
-        val u = url.lowercase()
-        return when {
-            u.contains(".m3u8") || u.contains("type=playlist") -> MimeTypes.APPLICATION_M3U8
-            u.contains(".mp4") -> MimeTypes.VIDEO_MP4
-            u.contains(".flv") -> MimeTypes.VIDEO_FLV
-            else -> MimeTypes.APPLICATION_M3U8
-        }
-    }
-
-    /**
-     * 关键：解析出来的流是**会话绑定的**（实测不带 Referer 直接 403），
-     * 所以必须把线路的 Referer 透传给 ExoPlayer，且共享 WebView 的 CookieJar。
-     */
-    private fun ensurePlayer(referer: String): ExoPlayer {
-        player?.let { if (curReferer == referer) return it }
-
-        player?.release()
-        player = null
-
-        val headers = HashMap<String, String>()
-        headers["User-Agent"] = Http.UA
-        headers["Referer"] = referer
-
-        val dsFactory = OkHttpDataSource.Factory(Http.client)
-            .setDefaultRequestProperties(headers)
-        val p = ExoPlayer.Builder(this)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(dsFactory))
-            .setSeekBackIncrementMs(10_000)
-            .setSeekForwardIncrementMs(10_000)
-            .build()
-        p.addListener(playerListener)
-        p.setHandleAudioBecomingNoisy(true)
-        b.playerView.player = p
-        curReferer = referer
-        player = p
-        return p
-    }
-
-    private val playerListener = object : Player.Listener {
-        override fun onPlayerError(error: PlaybackException) {
-            resumeMs = player?.currentPosition ?: resumeMs
-            val name = lines.getOrNull(lineIndex)?.name.orEmpty()
-            Log.e(TAG, "播放错误[$name] ${error.errorCodeName} pos=$resumeMs", error)
-            b.loading.visibility = View.VISIBLE
-            toast("播放出错：${error.errorCodeName}")
-            // 先原线路重试一次（流地址带了短时令牌，常是偶发取流不及时），再考虑换线路
-            if (name.isNotBlank() && retried.add(name)) {
-                b.statusText.text = "$name 播放出错，重试中…"
-                startResolve("重试")
-                return
-            }
-            setStatus(name, "播放失败")
-            b.statusText.text = "播放出错：${error.errorCodeName}"
-            if (autoSwitchOn) nextUntriedLine("播放错误")
-        }
-    }
-
-    // ── 线路切换 ────────────────────────────────────────────────────────
-
-    private fun switchLine(i: Int) {
-        if (i == lineIndex && player != null) {
-            togglePanel()
-            return
-        }
-        resumeMs = player?.currentPosition ?: resumeMs
-        lineIndex = i
-        panelOpen = false
-        renderPanel()
-        startResolve()
-    }
-
     private fun nextUntriedLine(why: String) {
-        Log.w(TAG, "换线路[$why] 已试=${tried}")
+        Log.w(TAG, "换线路[$why] 已试=$tried")
         val next = lines.indices.firstOrNull { lines[it].name !in tried }
         if (next == null) {
             b.loading.visibility = View.VISIBLE
             b.statusText.text = "所有线路都失败了（共 ${lines.size} 条）"
-            Log.w(TAG, "全部线路失败")
             return
         }
         lineIndex = next
@@ -274,17 +218,123 @@ class PlayerActivity : AppCompatActivity() {
         startResolve("换线:$why")
     }
 
-    private fun togglePanel() {
-        panelOpen = !panelOpen
+    // ── 选集 ────────────────────────────────────────────────────────────
+
+    private fun loadEpisodes() {
+        if (albumId.isBlank()) { b.btnEps.visibility = View.GONE; return }
+        Log.i(TAG, "拉选集 albumId=$albumId")
+        Thread {
+            val eps = PlatformApi.iqiyiEpisodes(albumId)
+            runOnUiThread {
+                episodes = eps
+                Log.i(TAG, "选集 ${eps.size} 集")
+                if (eps.isEmpty()) {
+                    b.btnEps.visibility = View.GONE
+                } else {
+                    b.btnEps.visibility = View.VISIBLE
+                    // 当前播放的是第几集
+                    epIndex = eps.indexOfFirst { it.url == videoUrl }
+                        .let { if (it >= 0) it else eps.indexOfFirst { sameTv(it.url, videoUrl) } }
+                    paintEps()
+                }
+            }
+        }.start()
+    }
+
+    /** 播放页 URL 可能带参数，比对 tvId 部分 */
+    private fun sameTv(a: String, b: String): Boolean {
+        val ra = Regex("""/v_([0-9a-zA-Z]+)\.html""").find(a)?.groupValues?.get(1) ?: return false
+        val rb = Regex("""/v_([0-9a-zA-Z]+)\.html""").find(b)?.groupValues?.get(1) ?: return false
+        return ra == rb
+    }
+
+    private fun gotoEpisode(i: Int) {
+        if (episodes.isEmpty()) return
+        if (i < 0 || i >= episodes.size) { toast("没有更多了"); return }
+        val ep = episodes[i]
+        Log.i(TAG, "切到第${ep.order}集 ${ep.url}")
+        epIndex = i
+        videoUrl = ep.url
+        resumeMs = 0
+        tried.clear(); retried.clear()
+        b.linePanel.visibility = View.GONE; linePanelOpen = false
+        b.epsPanel.visibility = View.GONE
+        paintEps()
+        startResolve("选集")
+    }
+
+    private fun toggleEpsPanel() {
+        if (episodes.isEmpty()) { toast("没有拿到选集列表"); return }
+        val show = b.epsPanel.visibility != View.VISIBLE
+        b.epsPanel.visibility = if (show) View.VISIBLE else View.GONE
+        b.linePanel.visibility = View.GONE; linePanelOpen = false
+    }
+
+    private fun paintEps() {
+        b.btnPrev.visibility = if (episodes.isEmpty()) View.GONE else View.VISIBLE
+        b.btnNext.visibility = if (episodes.isEmpty()) View.GONE else View.VISIBLE
+        b.btnPrev.alpha = if (epIndex > 0) 1f else 0.4f
+        b.btnNext.alpha = if (epIndex in 0 until episodes.size - 1) 1f else 0.4f
+        b.epsTitle.text = "选集 · 共 ${episodes.size} 集" +
+            if (epIndex >= 0) " · 正在播放第 ${episodes[epIndex].order} 集" else ""
+
+        b.epsList.removeAllViews()
+        val perRow = 5
+        var row: LinearLayout? = null
+        episodes.forEachIndexed { i, ep ->
+            if (i % perRow == 0) {
+                row = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+                }
+                b.epsList.addView(row)
+            }
+            val cur = i == epIndex
+            val btn = Button(this).apply {
+                text = ep.order.toString()
+                textSize = 12f
+                isAllCaps = false
+                minWidth = 0
+                minimumWidth = 0
+                setPadding(dp(4), 0, dp(4), 0)
+                setBackgroundColor(if (cur) 0xFF334A6B.toInt() else 0xFF1F2026.toInt())
+                setTextColor(if (cur) 0xFF4DA3FF.toInt() else 0xFFD8D8DC.toInt())
+                layoutParams = LinearLayout.LayoutParams(0, dp(44), 1f).apply {
+                    setMargins(dp(3), dp(3), dp(3), dp(3))
+                }
+                setOnClickListener { gotoEpisode(i) }
+            }
+            row?.addView(btn)
+        }
+    }
+
+    // ── 线路面板 ────────────────────────────────────────────────────────
+
+    private fun toggleLinePanel() {
+        linePanelOpen = !linePanelOpen
+        b.epsPanel.visibility = View.GONE
         renderPanel()
     }
+
+    private fun switchLine(i: Int) {
+        if (i == lineIndex) { toggleLinePanel(); return }
+        resumeMs = currentPosition()
+        lineIndex = i
+        linePanelOpen = false
+        tried.clear(); retried.clear()
+        renderPanel()
+        startResolve("手选线路")
+    }
+
+    private fun currentPosition(): Long = runCatching { b.player.currentPositionWhenPlaying }.getOrDefault(resumeMs)
 
     private fun renderPanel() {
         b.lineList.removeAllViews()
         lines.forEachIndexed { i, line ->
             val st = lineStatus[line.name].orEmpty()
+            val active = i == lineIndex
             val tv = TextView(this).apply {
-                val active = i == lineIndex
                 text = buildString {
                     append(if (active) "▶ " else "${i + 1}. ")
                     append(line.name)
@@ -294,14 +344,12 @@ class PlayerActivity : AppCompatActivity() {
                 textSize = 13.5f
                 setPadding(dp(14), dp(11), dp(14), dp(11))
                 layoutParams = ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                )
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
                 setOnClickListener { switchLine(i) }
             }
             b.lineList.addView(tv)
         }
-        b.linePanel.visibility = if (panelOpen) View.VISIBLE else View.GONE
+        b.linePanel.visibility = if (linePanelOpen) View.VISIBLE else View.GONE
         b.currentLineText.text = lines.getOrNull(lineIndex)?.name.orEmpty()
     }
 
@@ -314,25 +362,25 @@ class PlayerActivity : AppCompatActivity() {
 
     override fun onStop() {
         super.onStop()
-        resumeMs = player?.currentPosition ?: resumeMs
-        player?.pause()
+        resumeMs = currentPosition()
+        runCatching { b.player.onVideoPause() }
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        probe?.destroy()
-        probe = null
-        player?.release()
-        player = null
+        probe?.destroy(); probe = null
+        runCatching { orientationUtils?.releaseListener() }
+        runCatching { b.player.release() }
     }
 
-    private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
+    private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
     private fun toast(m: String) = Toast.makeText(this, m, Toast.LENGTH_SHORT).show()
 
     companion object {
         const val EXTRA_VIDEO_URL = "video_url"
         const val EXTRA_TITLE = "title"
         const val EXTRA_LINE_INDEX = "line_index"
+        const val EXTRA_ALBUM_ID = "album_id"
         const val TAG = "AvtpPlay"
         private const val TIMEOUT_MS = 40_000L
     }
