@@ -8,14 +8,33 @@
     android:paddingRight="5dp"
     android:paddingBottom="14dp">
 
-    <ImageView
-        android:id="@+id/cover"
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="158dp"
-        android:background="@drawable/bg_cover"
-        android:clipToOutline="true"
-        android:contentDescription="@null"
-        android:scaleType="centerCrop" />
+        android:layout_height="158dp">
+
+        <ImageView
+            android:id="@+id/cover"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/bg_cover"
+            android:contentDescription="@null"
+            android:scaleType="centerCrop" />
+
+        <!-- 没有封面时的设计化占位（优酷接口不吐封面图） -->
+        <TextView
+            android:id="@+id/coverFallback"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/bg_cover"
+            android:gravity="center"
+            android:maxLines="3"
+            android:paddingLeft="8dp"
+            android:paddingRight="8dp"
+            android:textColor="#66FFFFFF"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+    </FrameLayout>
 
     <TextView
         android:id="@+id/title"

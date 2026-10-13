@@ -13,6 +13,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.seagull.avtp.R
 import com.seagull.avtp.api.Item
 import com.seagull.avtp.api.PlatformApi
@@ -26,7 +27,7 @@ import com.seagull.avtp.ui.VideoAdapter
  * 首页：原生筛选 + 搜索（不加载官网页面）
  *
  *   爱奇艺 频道 pcw-api.iqiyi.com/search/recommend/list   / 搜索 search.video.iqiyi.com/o
- *   优酷   搜索 search.youku.com/api/search（自带 类型/时长/清晰度/排序 筛选）
+ *   优酷   搜索 search.youku.com/api/search（自带 类型/时长/清晰度/排序 筛选；接口不返回封面）
  *   腾讯   频道 v.qq.com/channel/<slug> 内联脚本正则兜底 / 搜索接口带签名，暂缺
  */
 class BrowseActivity : AppCompatActivity() {
@@ -36,14 +37,19 @@ class BrowseActivity : AppCompatActivity() {
     private var channelId = "1"
     private var channelSlug = "tv"
     private var channelWord = "电视剧"
-    private var chips: List<Button> = emptyList()
+
+    private var page = 1
+    private var loadingMore = false
+    private var noMore = false
+    private var keyword = ""          // 非空 = 搜索模式
 
     private val adapter = VideoAdapter { openPlayer(it) }
 
     private val iqiyiChannels = listOf("电影" to "1", "电视剧" to "2", "综艺" to "6", "动漫" to "4", "纪录片" to "3")
     private val youkuWords = listOf("电视剧", "电影", "综艺", "动漫", "纪录片")
     private val qqChannels = listOf(
-        "电视剧" to "tv", "电影" to "movie", "综艺" to "variety", "动漫" to "anime", "纪录片" to "documentary",
+        "电视剧" to "tv", "电影" to "movie", "综艺" to "variety",
+        "动漫" to "cartoon", "纪录片" to "doco",
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -53,6 +59,13 @@ class BrowseActivity : AppCompatActivity() {
 
         b.avtpGrid.layoutManager = GridLayoutManager(this, 3)
         b.avtpGrid.adapter = adapter
+        b.avtpGrid.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrolled(rv: RecyclerView, dx: Int, dy: Int) {
+                if (dy <= 0 || loadingMore || noMore) return
+                val lm = rv.layoutManager as? GridLayoutManager ?: return
+                if (lm.findLastVisibleItemPosition() >= adapter.size() - 6) loadPage(reset = false)
+            }
+        })
 
         b.avtpTabIqiyi.setOnClickListener { switchPlatform(Platform.IQIYI) }
         b.avtpTabYouku.setOnClickListener { switchPlatform(Platform.YOUKU) }
@@ -84,11 +97,11 @@ class BrowseActivity : AppCompatActivity() {
         }
     }
 
-    // ── 平台切换 ────────────────────────────────────────────────────────
+    // ── 平台 / 筛选 ─────────────────────────────────────────────────────
 
     private fun switchPlatform(p: Platform) {
         platform = p
-        adapter.clear()
+        keyword = ""
         b.avtpSearch.setText("")
         b.avtpTabIqiyi.isSelected = p == Platform.IQIYI
         b.avtpTabYouku.isSelected = p == Platform.YOUKU
@@ -101,10 +114,11 @@ class BrowseActivity : AppCompatActivity() {
         }
         buildChips(list)
         when (p) {
-            Platform.YOUKU -> { channelWord = "电视剧"; loadYouku(null) }
-            Platform.QQ -> { channelSlug = "tv"; loadTencent() }
-            else -> { channelId = "1"; loadIqiyiChannel() }
+            Platform.YOUKU -> { channelWord = "电视剧"; b.avtpSearch.hint = "搜剧名（频道词可作筛选）" }
+            Platform.QQ -> { channelSlug = "tv"; b.avtpSearch.hint = "腾讯搜索暂缺，用频道浏览" }
+            else -> { channelId = "1"; b.avtpSearch.hint = "搜剧名 / 演员" }
         }
+        loadPage(reset = true)
     }
 
     private fun buildChips(list: List<Pair<String, String>>) {
@@ -116,78 +130,76 @@ class BrowseActivity : AppCompatActivity() {
             btn.isSelected = i == 0
             btn.setOnClickListener {
                 btns.forEachIndexed { j, x -> x.isSelected = (j == i) }
+                keyword = ""
                 when (platform) {
-                    Platform.YOUKU -> { channelWord = value; loadYouku(null) }
-                    Platform.QQ -> { channelSlug = value; loadTencent() }
-                    else -> { channelId = value; loadIqiyiChannel() }
+                    Platform.YOUKU -> channelWord = value
+                    Platform.QQ -> channelSlug = value
+                    else -> channelId = value
                 }
+                loadPage(reset = true)
             }
             btns.add(btn)
             b.avtpChips.addView(btn)
         }
-        chips = btns
-    }
-
-    // ── 数据 ────────────────────────────────────────────────────────────
-
-    private fun loadIqiyiChannel() {
-        busy("加载中…")
-        Thread {
-            val list = PlatformApi.iqiyiChannel(channelId, 1)
-            done(if (list.isEmpty()) "没拿到数据（接口可能变了）" else "爱奇艺 · 共 ${list.size} 条", list)
-        }.start()
-    }
-
-    private fun loadYouku(keyword: String?) {
-        val kw = keyword ?: channelWord
-        busy("加载「$kw」…")
-        Thread {
-            val list = PlatformApi.youkuSearch(kw, 1)
-            done(if (list.isEmpty()) "「$kw」没结果" else "优酷 · 「$kw」共 ${list.size} 条", list)
-        }.start()
-    }
-
-    private fun loadTencent() {
-        busy("加载中…")
-        Thread {
-            val list = PlatformApi.tencentChannel(channelSlug)
-            done(
-                if (list.isEmpty()) "腾讯频道页没解析到（兜底方案，可能失效）"
-                else "腾讯 · 共 ${list.size} 条（频道页兜底）", list
-            )
-        }.start()
     }
 
     private fun doSearch() {
         val kw = b.avtpSearch.text.toString().trim()
         if (kw.isBlank()) { toast("先输个剧名"); return }
-        busy("搜索「$kw」…")
+        keyword = kw
+        loadPage(reset = true)
+    }
+
+    // ── 数据 ────────────────────────────────────────────────────────────
+
+    private fun loadPage(reset: Boolean) {
+        if (reset) { page = 1; noMore = false; adapter.clear() } else {
+            if (loadingMore || noMore) return
+            loadingMore = true
+        }
+        val p = page
+        busy(if (reset) "加载中…" else "加载第 $p 页…")
+
         Thread {
-            val list = when (platform) {
-                Platform.YOUKU -> PlatformApi.youkuSearch(kw, 1)
-                Platform.IQIYI -> PlatformApi.iqiyiSearch(kw, 1)
-                else -> emptyList()
+            val list = fetch(p)
+            runOnUiThread {
+                loadingMore = false
+                b.avtpLoading.visibility = View.GONE
+                if (list.isEmpty()) {
+                    if (reset) { noMore = true; adapter.submit(emptyList()) } else noMore = true
+                    b.avtpStatus.text = emptyMsg()
+                    return@runOnUiThread
+                }
+                if (reset) adapter.submit(list) else adapter.append(list)
+                if (list.size < PAGE_SIZE) noMore = true
+                b.avtpStatus.text = "${platform.label} · ${if (keyword.isNotBlank()) "「$keyword」" else channelLabel()} · ${adapter.size()} 条${if (noMore) "" else " · 滑到底加载更多"}"
             }
-            val msg = when {
-                platform == Platform.QQ -> "腾讯搜索接口带签名，还没接上（先用频道页兜底）"
-                list.isEmpty() -> "「$kw」没搜到结果"
-                else -> "${platform.label} · 「$kw」共 ${list.size} 条"
-            }
-            done(msg, list)
         }.start()
+    }
+
+    private fun fetch(p: Int): List<Item> = when (platform) {
+        Platform.IQIYI -> if (keyword.isNotBlank()) PlatformApi.iqiyiSearch(keyword, p)
+                          else PlatformApi.iqiyiChannel(channelId, p)
+        Platform.YOUKU -> PlatformApi.youkuSearch(if (keyword.isNotBlank()) keyword else channelWord, page = p)
+        Platform.QQ -> if (p == 1) PlatformApi.tencentChannel(channelSlug) else emptyList()
+    }
+
+    private fun channelLabel(): String = when (platform) {
+        Platform.YOUKU -> channelWord
+        Platform.QQ -> qqChannels.firstOrNull { it.second == channelSlug }?.first ?: "频道"
+        else -> iqiyiChannels.firstOrNull { it.second == channelId }?.first ?: "频道"
+    }
+
+    private fun emptyMsg(): String = when {
+        platform == Platform.QQ && keyword.isNotBlank() -> "腾讯搜索接口带签名，还没接上（先用上方频道浏览）"
+        platform == Platform.QQ -> "腾讯「${channelLabel()}」频道页没解析到（正则兜底，可能失效）"
+        keyword.isNotBlank() -> "「$keyword」没搜到结果"
+        else -> "没拿到数据（接口可能变了）"
     }
 
     private fun busy(msg: String) {
         b.avtpLoading.visibility = View.VISIBLE
         b.avtpStatus.text = msg
-    }
-
-    private fun done(msg: String, list: List<Item>) {
-        runOnUiThread {
-            b.avtpLoading.visibility = View.GONE
-            b.avtpStatus.text = msg
-            adapter.submit(list)
-        }
     }
 
     // ── 粘贴解析 ────────────────────────────────────────────────────────
@@ -214,8 +226,7 @@ class BrowseActivity : AppCompatActivity() {
             .setTitle("链接解析")
             .setView(wrap)
             .setPositiveButton("解析播放") { _, _ ->
-                val raw = input.text.toString()
-                val n = UrlNormalizer.normalize(raw)
+                val n = UrlNormalizer.normalize(input.text.toString())
                 if (n == null) toast("没识别出爱优腾链接") else openPlayer(Item("解析", "", n.second))
             }
             .setNegativeButton("取消", null)
@@ -238,5 +249,6 @@ class BrowseActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_PLATFORM = "platform"
+        private const val PAGE_SIZE = 24
     }
 }

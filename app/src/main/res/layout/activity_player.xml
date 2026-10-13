@@ -73,11 +73,30 @@
             android:id="@+id/avtpBtnEps"
             style="@style/Chip"
             android:layout_height="30dp"
-            android:layout_marginRight="2dp"
             android:background="#00000000"
             android:paddingLeft="10dp"
             android:paddingRight="10dp"
             android:text="选集"
+            android:textColor="@color/player_accent"
+            android:textSize="11.5sp" />
+
+        <View
+            android:layout_width="1dp"
+            android:layout_height="16dp"
+            android:layout_marginLeft="2dp"
+            android:layout_marginRight="2dp"
+            android:background="#33FFFFFF" />
+
+        <!-- 线路放进顶部胶囊：原来放右下角会和 GSY 自带的全屏按钮叠在一起 -->
+        <Button
+            android:id="@+id/avtpBtnLines"
+            style="@style/Chip"
+            android:layout_height="30dp"
+            android:layout_marginRight="2dp"
+            android:background="#00000000"
+            android:paddingLeft="10dp"
+            android:paddingRight="10dp"
+            android:text="线路"
             android:textColor="@color/player_accent"
             android:textSize="11.5sp" />
     </LinearLayout>
@@ -144,14 +163,14 @@
         </ScrollView>
     </LinearLayout>
 
-    <!-- 线路面板 -->
+    <!-- 线路面板：贴右上角，在顶部胶囊下方 -->
     <LinearLayout
         android:id="@+id/avtpLinePanel"
         android:layout_width="250dp"
         android:layout_height="wrap_content"
-        android:layout_gravity="bottom|end"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="56dp"
         android:layout_marginEnd="14dp"
-        android:layout_marginBottom="88dp"
         android:background="@drawable/bg_panel"
         android:orientation="vertical"
         android:paddingTop="8dp"
@@ -175,17 +194,4 @@
             android:layout_height="wrap_content"
             android:orientation="vertical" />
     </LinearLayout>
-
-    <Button
-        android:id="@+id/avtpBtnLines"
-        style="@style/PrimaryButton"
-        android:layout_width="wrap_content"
-        android:layout_height="40dp"
-        android:layout_gravity="bottom|end"
-        android:layout_marginEnd="14dp"
-        android:layout_marginBottom="22dp"
-        android:paddingLeft="22dp"
-        android:paddingRight="22dp"
-        android:text="线路"
-        android:textSize="13sp" />
 </FrameLayout>
