@@ -2,10 +2,8 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#000000">
+    android:background="@color/player_bg">
 
-    <!-- WebView 抓流探针：垫在最底层，被上面的播放器盖住。
-         必须给足尺寸 —— 1x1 会让部分播放器页的 JS 布局/检测失效。 -->
     <FrameLayout
         android:id="@+id/avtpProbeHost"
         android:layout_width="match_parent"
@@ -20,63 +18,70 @@
         android:id="@+id/avtpBar"
         style="?android:attr/progressBarStyleHorizontal"
         android:layout_width="match_parent"
-        android:layout_height="3dp"
+        android:layout_height="2.5dp"
         android:layout_gravity="top"
         android:indeterminate="true"
-        android:indeterminateTint="#4DA3FF"
+        android:indeterminateTint="@color/player_accent"
         android:visibility="gone" />
 
-    <!-- 顶部操作条：选集 / 上一集 / 下一集 -->
+    <!-- 顶部胶囊：选集 / 上一集 / 下一集 -->
     <LinearLayout
         android:layout_width="wrap_content"
-        android:layout_height="36dp"
+        android:layout_height="38dp"
         android:layout_gravity="top|end"
-        android:layout_marginTop="8dp"
-        android:layout_marginEnd="10dp"
-        android:background="#B316171B"
+        android:layout_marginTop="10dp"
+        android:layout_marginEnd="12dp"
+        android:background="@drawable/bg_pill"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingLeft="6dp"
-        android:paddingRight="6dp">
+        android:paddingLeft="4dp"
+        android:paddingRight="4dp">
 
         <Button
             android:id="@+id/avtpBtnPrev"
-            android:layout_width="wrap_content"
+            style="@style/Chip"
             android:layout_height="30dp"
+            android:layout_marginLeft="2dp"
             android:background="#00000000"
-            android:minWidth="0dp"
-            android:paddingLeft="8dp"
-            android:paddingRight="8dp"
+            android:paddingLeft="10dp"
+            android:paddingRight="10dp"
             android:text="上一集"
-            android:textColor="#E8E8E8"
-            android:textSize="11sp" />
+            android:textColor="#FFD8DCE2"
+            android:textSize="11.5sp" />
 
         <Button
             android:id="@+id/avtpBtnNext"
-            android:layout_width="wrap_content"
+            style="@style/Chip"
             android:layout_height="30dp"
+            android:layout_marginLeft="2dp"
             android:background="#00000000"
-            android:minWidth="0dp"
-            android:paddingLeft="8dp"
-            android:paddingRight="8dp"
+            android:paddingLeft="10dp"
+            android:paddingRight="10dp"
             android:text="下一集"
-            android:textColor="#E8E8E8"
-            android:textSize="11sp" />
+            android:textColor="#FFD8DCE2"
+            android:textSize="11.5sp" />
+
+        <View
+            android:id="@+id/avtpDivider"
+            android:layout_width="1dp"
+            android:layout_height="16dp"
+            android:layout_marginLeft="2dp"
+            android:layout_marginRight="2dp"
+            android:background="#33FFFFFF" />
 
         <Button
             android:id="@+id/avtpBtnEps"
-            android:layout_width="wrap_content"
+            style="@style/Chip"
             android:layout_height="30dp"
+            android:layout_marginRight="2dp"
             android:background="#00000000"
-            android:minWidth="0dp"
-            android:paddingLeft="8dp"
-            android:paddingRight="8dp"
+            android:paddingLeft="10dp"
+            android:paddingRight="10dp"
             android:text="选集"
-            android:textColor="#4DA3FF"
-            android:textSize="11sp" />
+            android:textColor="@color/player_accent"
+            android:textSize="11.5sp" />
     </LinearLayout>
 
-    <!-- 加载/状态 -->
     <LinearLayout
         android:id="@+id/avtpLoading"
         android:layout_width="wrap_content"
@@ -84,12 +89,12 @@
         android:layout_gravity="center"
         android:gravity="center"
         android:orientation="vertical"
-        android:padding="24dp">
+        android:padding="26dp">
 
         <ProgressBar
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:indeterminateTint="#4DA3FF" />
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:indeterminateTint="@color/player_accent" />
 
         <TextView
             android:id="@+id/avtpStatus"
@@ -97,7 +102,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="14dp"
             android:gravity="center"
-            android:textColor="#DDDDDD"
+            android:textColor="#FFD5D9DF"
             android:textSize="13sp" />
     </LinearLayout>
 
@@ -105,62 +110,63 @@
     <LinearLayout
         android:id="@+id/avtpEpsPanel"
         android:layout_width="match_parent"
-        android:layout_height="260dp"
+        android:layout_height="270dp"
         android:layout_gravity="bottom"
-        android:background="#F216171B"
+        android:background="@drawable/bg_panel_top"
         android:orientation="vertical"
-        android:paddingTop="8dp"
-        android:paddingBottom="8dp"
+        android:paddingTop="14dp"
+        android:paddingBottom="12dp"
         android:visibility="gone">
 
         <TextView
             android:id="@+id/avtpEpsTitle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingLeft="14dp"
-            android:paddingRight="14dp"
-            android:paddingBottom="6dp"
+            android:paddingLeft="18dp"
+            android:paddingRight="18dp"
+            android:paddingBottom="10dp"
             android:text="选集"
-            android:textColor="#8A8A8E"
-            android:textSize="11sp" />
+            android:textColor="@color/text2"
+            android:textSize="11.5sp" />
 
         <ScrollView
             android:layout_width="match_parent"
-            android:layout_height="match_parent">
+            android:layout_height="match_parent"
+            android:scrollbars="none">
 
             <LinearLayout
                 android:id="@+id/avtpEpsList"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:paddingLeft="10dp"
-                android:paddingRight="10dp" />
+                android:paddingLeft="12dp"
+                android:paddingRight="12dp" />
         </ScrollView>
     </LinearLayout>
 
     <!-- 线路面板 -->
     <LinearLayout
         android:id="@+id/avtpLinePanel"
-        android:layout_width="248dp"
+        android:layout_width="250dp"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
         android:layout_marginEnd="14dp"
-        android:layout_marginBottom="86dp"
-        android:background="#F216171B"
+        android:layout_marginBottom="88dp"
+        android:background="@drawable/bg_panel"
         android:orientation="vertical"
-        android:paddingTop="6dp"
-        android:paddingBottom="6dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
         android:visibility="gone">
 
         <TextView
             android:id="@+id/avtpCurrentLine"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingLeft="14dp"
+            android:paddingLeft="16dp"
             android:paddingTop="8dp"
-            android:paddingRight="14dp"
+            android:paddingRight="16dp"
             android:paddingBottom="8dp"
-            android:textColor="#8A8A8E"
+            android:textColor="@color/text2"
             android:textSize="11sp" />
 
         <LinearLayout
@@ -172,14 +178,14 @@
 
     <Button
         android:id="@+id/avtpBtnLines"
+        style="@style/PrimaryButton"
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_height="40dp"
         android:layout_gravity="bottom|end"
         android:layout_marginEnd="14dp"
-        android:layout_marginBottom="20dp"
-        android:minWidth="0dp"
-        android:paddingLeft="20dp"
-        android:paddingRight="20dp"
+        android:layout_marginBottom="22dp"
+        android:paddingLeft="22dp"
+        android:paddingRight="22dp"
         android:text="线路"
         android:textSize="13sp" />
 </FrameLayout>

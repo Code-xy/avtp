@@ -139,11 +139,24 @@ object PlatformApi {
     // ── 优酷 ───────────────────────────────────────────────────────────
 
     /**
-     * 优酷搜索 —— search.youku.com/api/search 直接吐 JSON，且 pageData.filter 自带筛选项
-     * 结果藏在 pageComponentList[].componentMap[*].data[]，条目有 videoId
+     * 优酷搜索（带筛选）
+     * search.youku.com/api/search?keyword=&page=&cate=&duration=&format=&order=
+     * 筛选项来自接口自己的 pageData.filter：
+     *   cate     0=精选 2007=影视
+     *   duration 0-0全部 / 0-600 / 600-1800 / 1800-3600 / 3600-0
+     *   format   0全部 1高清 6超清 7蓝光
+     *   order    0综合 1新发布 2播放多
      */
-    fun youkuSearch(keyword: String, page: Int = 1): List<Item> {
-        val u = "https://search.youku.com/api/search?keyword=${enc(keyword)}&page=$page"
+    fun youkuSearch(
+        keyword: String,
+        page: Int = 1,
+        cate: String = "0",
+        duration: String = "0-0",
+        format: String = "0",
+        order: String = "0",
+    ): List<Item> {
+        val u = "https://search.youku.com/api/search?keyword=${enc(keyword)}&page=$page" +
+            "&cate=$cate&duration=$duration&format=$format&order=$order"
         val body = get(u, "https://www.youku.com/") ?: return emptyList()
         val root = runCatching { JSONObject(body) }.getOrNull() ?: return emptyList()
         if (root.optString("message") != "success") return emptyList()
@@ -172,6 +185,39 @@ object PlatformApi {
         }
         return out.distinctBy { it.pageUrl }
     }
+
+    // ── 腾讯 ───────────────────────────────────────────────────────────
+
+    /**
+     * 腾讯频道列表。
+     * v.qq.com/channel/{tv,movie,variety,anime,documentary} 是 SSR 页面，
+     * 内联脚本里是一堆 JS 对象字面量，形如：
+     *   ...sourceTitle:"伟大的长征",...coverPic:"https://...",...cutJumpUrl:"https://v.qq.com/x/cover/<cid>.html"
+     * 所以按 cutJumpUrl 切段，往每段前面找标题和封面。
+     * 这是兜底方案（搜索接口 pbaccess 带签名，没能免签调通）。
+     */
+    fun tencentChannel(slug: String): List<Item> {
+        val html = get("https://v.qq.com/channel/$slug", "https://v.qq.com/") ?: return emptyList()
+        val parts = html.split("cutJumpUrl:\"")
+        if (parts.size < 2) return emptyList()
+
+        val rxCid = Regex("""^(https://v\.qq\.com/x/cover/[0-9a-zA-Z]+\.html)""")
+        val rxTitle = Regex("""(?:mzTitle|sourceTitle|title):"([^"]{1,60})"""")
+        val rxCover = Regex("""coverPic:"([^"]+)"""")
+
+        val out = ArrayList<Item>()
+        for (i in 1 until parts.size) {
+            val url = rxCid.find(parts[i])?.groupValues?.get(1) ?: continue
+            val back = parts[i - 1].takeLast(5000)
+            val title = rxTitle.findAll(back).lastOrNull()?.groupValues?.get(1).orEmpty()
+            if (title.isBlank()) continue
+            val cover = rxCover.findAll(back).lastOrNull()?.groupValues?.get(1).orEmpty()
+            out.add(Item(title, cover, url))
+        }
+        return out.distinctBy { it.pageUrl }
+    }
+
+    fun tencentSearch(keyword: String, page: Int = 1): List<Item> = emptyList()
 
     private fun youkuCover(o: JSONObject): String {
         for (k in listOf("img", "image", "poster", "cover", "thumbnail", "imgUrl")) {
@@ -237,14 +283,4 @@ object PlatformApi {
         return out
     }
 
-    // ── 腾讯（待接）────────────────────────────────────────────────────
-
-    /**
-     * 腾讯详情已通：node.video.qq.com/x/api/float_vinfo2?cid=xxx
-     * 搜索/筛选还没找到无签名的公开接口（页面是 SPA，走 pbaccess 带签）。
-     * 暂时用图文提示，后续补。
-     */
-    fun tencentSearch(keyword: String, page: Int = 1): List<Item> = emptyList()
-
-    fun stripHtml(s: String): String = s.replace(Regex("<[^>]+>"), "").trim()
 }

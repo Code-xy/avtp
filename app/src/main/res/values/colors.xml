@@ -1,5 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#101216</color>
-    <color name="accent">#FF4DA3FF</color>
+
+    <!-- 设计 token：暗色玻璃感，层次靠明度差，不靠描边 -->
+    <color name="bg">#0B0C0F</color>
+    <color name="surface">#15171C</color>
+    <color name="surface2">#1D2026</color>
+    <color name="surface3">#262A32</color>
+    <color name="line">#2A2E36</color>
+
+    <color name="accent">#FF4C9AFF</color>
+    <color name="accentDim">#334C9AFF</color>
+    <color name="ok">#FF34C759</color>
+    <color name="warn">#FFFFB020</color>
+
+    <color name="text">#FFF2F3F5</color>
+    <color name="text2">#FF9BA1A9</color>
+    <color name="text3">#FF6A7078</color>
+
+    <color name="player_bg">#FF000000</color>
+    <color name="player_accent">#FF4C9AFF</color>
 </resources>

@@ -2,130 +2,149 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0E0F12"
+    android:background="@color/bg"
     android:orientation="vertical">
 
-    <!-- 平台切换 -->
+    <!-- 标题栏 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#141519"
+        android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingLeft="10dp"
-        android:paddingTop="10dp"
-        android:paddingRight="10dp"
+        android:paddingLeft="18dp"
+        android:paddingTop="18dp"
+        android:paddingRight="18dp"
         android:paddingBottom="6dp">
 
-        <Button
-            android:id="@+id/tabIqiyi"
+        <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="爱奇艺"
-            android:textSize="13sp" />
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="爱优腾"
+                android:textColor="@color/text"
+                android:textSize="21sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/avtpStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="选频道，或直接搜剧名"
+                android:textColor="@color/text2"
+                android:textSize="11.5sp" />
+        </LinearLayout>
 
         <Button
-            android:id="@+id/tabYouku"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_weight="1"
-            android:text="优酷"
-            android:textSize="13sp" />
+            android:id="@+id/avtpBtnPaste"
+            style="@style/Chip"
+            android:text="粘贴解析" />
+    </LinearLayout>
+
+    <!-- 平台 Tab -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingLeft="16dp"
+        android:paddingTop="10dp"
+        android:paddingRight="16dp"
+        android:paddingBottom="4dp">
 
         <Button
-            android:id="@+id/tabQq"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_weight="1"
-            android:text="腾讯视频"
-            android:textSize="13sp" />
+            android:id="@+id/avtpTabIqiyi"
+            style="@style/PlatformTab"
+            android:text="爱奇艺" />
+
+        <Button
+            android:id="@+id/avtpTabYouku"
+            style="@style/PlatformTab"
+            android:layout_marginLeft="8dp"
+            android:text="优酷" />
+
+        <Button
+            android:id="@+id/avtpTabQq"
+            style="@style/PlatformTab"
+            android:layout_marginLeft="8dp"
+            android:text="腾讯" />
     </LinearLayout>
 
     <!-- 搜索 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#141519"
         android:orientation="horizontal"
-        android:paddingLeft="10dp"
-        android:paddingTop="6dp"
-        android:paddingRight="10dp"
-        android:paddingBottom="10dp">
+        android:paddingLeft="16dp"
+        android:paddingTop="10dp"
+        android:paddingRight="16dp"
+        android:paddingBottom="4dp">
 
         <EditText
-            android:id="@+id/searchInput"
+            android:id="@+id/avtpSearch"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="44dp"
             android:layout_weight="1"
-            android:background="#1A1B20"
+            android:background="@drawable/bg_input"
             android:hint="搜剧名 / 演员"
             android:imeOptions="actionSearch"
             android:inputType="text"
             android:maxLines="1"
-            android:padding="10dp"
-            android:textColor="#FFFFFF"
-            android:textColorHint="#5A5A60"
-            android:textSize="13sp" />
+            android:paddingLeft="14dp"
+            android:paddingRight="14dp"
+            android:textColor="@color/text"
+            android:textColorHint="@color/text3"
+            android:textSize="13.5sp" />
 
         <Button
-            android:id="@+id/btnSearch"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:text="搜索"
-            android:textSize="13sp" />
+            android:id="@+id/avtpBtnSearch"
+            style="@style/PrimaryButton"
+            android:layout_width="76dp"
+            android:layout_height="44dp"
+            android:layout_marginLeft="8dp"
+            android:text="搜索" />
     </LinearLayout>
 
-    <!-- 筛选条（动态填充） -->
+    <!-- 筛选 chips -->
     <HorizontalScrollView
+        android:id="@+id/avtpChipBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#101216"
+        android:paddingTop="8dp"
+        android:paddingBottom="2dp"
         android:scrollbars="none">
 
         <LinearLayout
-            android:id="@+id/chips"
+            android:id="@+id/avtpChips"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:paddingLeft="10dp"
-            android:paddingTop="8dp"
-            android:paddingRight="10dp"
-            android:paddingBottom="8dp" />
+            android:paddingLeft="16dp"
+            android:paddingRight="16dp" />
     </HorizontalScrollView>
 
-    <TextView
-        android:id="@+id/statusText"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="#101216"
-        android:paddingLeft="14dp"
-        android:paddingTop="6dp"
-        android:paddingRight="14dp"
-        android:paddingBottom="6dp"
-        android:text="选个频道，或直接搜"
-        android:textColor="#8A8A8E"
-        android:textSize="11sp" />
-
     <ProgressBar
-        android:id="@+id/loading"
+        android:id="@+id/avtpLoading"
         style="?android:attr/progressBarStyleHorizontal"
         android:layout_width="match_parent"
-        android:layout_height="3dp"
+        android:layout_height="2.5dp"
+        android:layout_marginTop="6dp"
         android:indeterminate="true"
-        android:indeterminateTint="#4DA3FF"
+        android:indeterminateTint="@color/accent"
         android:visibility="gone" />
 
     <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/grid"
+        android:id="@+id/avtpGrid"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:paddingLeft="6dp"
-        android:paddingTop="6dp"
-        android:paddingRight="6dp"
-        android:paddingBottom="10dp"
-        android:clipToPadding="false" />
+        android:clipToPadding="false"
+        android:paddingLeft="10dp"
+        android:paddingTop="10dp"
+        android:paddingRight="10dp"
+        android:paddingBottom="16dp" />
 </LinearLayout>
