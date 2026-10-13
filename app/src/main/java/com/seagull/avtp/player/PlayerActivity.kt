@@ -7,6 +7,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.datasource.okhttp.OkHttpDataSource
@@ -40,6 +41,7 @@ class PlayerActivity : AppCompatActivity() {
 
     private val lineStatus = HashMap<String, String>()
     private val tried = LinkedHashSet<String>()
+    private val retried = HashSet<String>()
     private val autoSwitchOn = true
 
     private val lines: List<Line> get() = LinePool.DEFAULT
@@ -105,7 +107,14 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun play(stream: String, line: Line) {
         val p = ensurePlayer(line.referer)
-        p.setMediaItem(MediaItem.fromUri(stream))
+        // ★ 关键：解析线路给的流地址大多没有 .m3u8 后缀（形如 /global?...&type=playlist），
+        //   ExoPlayer 光看 URI 推断不出类型，会当成普通视频文件用 ProgressiveMediaSource 打开，
+        //   报 UnrecognizedInputFormatException。必须显式指定 MIME。
+        val item = MediaItem.Builder()
+            .setUri(stream)
+            .setMimeType(mimeFor(stream))
+            .build()
+        p.setMediaItem(item)
         p.seekTo(resumeMs)
         p.prepare()
         p.playWhenReady = true
@@ -114,6 +123,16 @@ class PlayerActivity : AppCompatActivity() {
         // 流地址已到 ExoPlayer 手里，探针立刻退场（cookie 在全局 CookieManager 里，不会丢）
         probe?.destroy()
         probe = null
+    }
+
+    private fun mimeFor(url: String): String {
+        val u = url.lowercase()
+        return when {
+            u.contains(".m3u8") || u.contains("type=playlist") -> MimeTypes.APPLICATION_M3U8
+            u.contains(".mp4") -> MimeTypes.VIDEO_MP4
+            u.contains(".flv") -> MimeTypes.VIDEO_FLV
+            else -> MimeTypes.APPLICATION_M3U8
+        }
     }
 
     /**
@@ -148,9 +167,18 @@ class PlayerActivity : AppCompatActivity() {
     private val playerListener = object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
             resumeMs = player?.currentPosition ?: resumeMs
-            toast("播放出错：${error.errorCodeName}")
+            val name = lines.getOrNull(lineIndex)?.name.orEmpty()
             b.loading.visibility = View.VISIBLE
-            b.statusText.text = "播放出错：${error.errorCodeName}，尝试下一条线路…"
+            toast("播放出错：${error.errorCodeName}")
+            // 先原线路重试一次（流地址带了短时令牌，常是偶发取流不及时），再考虑换线路
+            if (name.isNotBlank() && retried.add(name)) {
+                b.statusText.text = "$name 播放出错，重试中…"
+                retried.add(name)
+                startResolve()
+                return
+            }
+            setStatus(name, "播放失败")
+            b.statusText.text = "播放出错：${error.errorCodeName}"
             if (autoSwitchOn) nextUntriedLine()
         }
     }
