@@ -108,7 +108,7 @@ class WebViewProbe(
             override fun onPageFinished(view: WebView, url: String) {
                 Log.i(TAG, "onPageFinished: $url")
                 onProgress("页面已就绪，尝试触发播放…")
-                for (d in longArrayOf(500, 1200, 2500, 4500, 7000, 11000, 16000)) {
+                for (d in longArrayOf(600, 2000, 4000)) {
                     main.postDelayed(clickTask, d)
                 }
             }

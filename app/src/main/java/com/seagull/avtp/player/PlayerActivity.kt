@@ -18,6 +18,7 @@ import com.seagull.avtp.parse.Http
 import com.seagull.avtp.parse.Line
 import com.seagull.avtp.parse.LinePool
 import com.seagull.avtp.parse.WebViewProbe
+import okhttp3.Request
 import java.util.concurrent.TimeUnit
 
 /**
@@ -91,22 +92,56 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun onStreamFound(stream: String, line: Line) {
-        setStatus(line.name, "可用")
-        b.statusText.text = "${line.name} 已出流，正在加载…"
-        play(stream, line)
+        b.statusText.text = "${line.name} 已出流，校验播放头…"
+        // 各线路对 Referer 的要求不一样：有的认自己域名，有的认原站，有的完全不要。
+        // 拿到的流地址先挨个试，(能拉到 #EXTM3U 头) 的那个才拿去播。
+        Thread {
+            val working = pickReferer(stream, line)
+            runOnUiThread {
+                if (working == null) {
+                    setStatus(line.name, "流不可播")
+                    b.loading.visibility = View.VISIBLE
+                    b.statusText.text = "${line.name}：流地址拿回来了但拉不到播放列表"
+                    if (autoSwitchOn) nextUntriedLine()
+                } else {
+                    setStatus(line.name, "可用")
+                    play(stream, line, working)
+                }
+            }
+        }.start()
     }
 
-    private fun onResolveFail(reason: String, line: Line) {
-        setStatus(line.name, "失效")
-        b.statusText.text = "${line.name}：$reason"
-        b.loading.visibility = View.VISIBLE
-        probe?.destroy()
-        probe = null
-        if (autoSwitchOn) nextUntriedLine()
+    /** 逐个候选 Referer 试拉 m3u8，返回第一个能返回 #EXTM3U 的 */
+    private fun pickReferer(stream: String, line: Line): String? {
+        val candidates = LinkedHashSet<String>()
+        candidates.add(line.referer)
+        candidates.add("")
+        platformOrigin()?.let { candidates.add(it) }
+        candidates.add("https://jx.202617.xyz/")
+        for (r in candidates) if (loadsPlaylist(stream, r)) return r
+        return null
     }
 
-    private fun play(stream: String, line: Line) {
-        val p = ensurePlayer(line.referer)
+    private fun loadsPlaylist(url: String, referer: String): Boolean = try {
+        val rb = Request.Builder().url(url).header("User-Agent", Http.UA)
+        if (referer.isNotBlank()) rb.header("Referer", referer)
+        Http.client.newCall(rb.build()).execute().use { resp ->
+            if (resp.isSuccessful) {
+                resp.body?.string().orEmpty().trimStart().startsWith("#EXTM3U")
+            } else false
+        }
+    } catch (e: Exception) {
+        false
+    }
+
+    /** 原视频站的 origin，有些线路认这个做防盗链 */
+    private fun platformOrigin(): String? = runCatching {
+        val h = java.net.URI(videoUrl).host ?: return@runCatching null
+        "https://$h/"
+    }.getOrNull()
+
+    private fun play(stream: String, line: Line, referer: String) {
+        val p = ensurePlayer(referer)
         // ★ 关键：解析线路给的流地址大多没有 .m3u8 后缀（形如 /global?...&type=playlist），
         //   ExoPlayer 光看 URI 推断不出类型，会当成普通视频文件用 ProgressiveMediaSource 打开，
         //   报 UnrecognizedInputFormatException。必须显式指定 MIME。
@@ -123,6 +158,15 @@ class PlayerActivity : AppCompatActivity() {
         // 流地址已到 ExoPlayer 手里，探针立刻退场（cookie 在全局 CookieManager 里，不会丢）
         probe?.destroy()
         probe = null
+    }
+
+    private fun onResolveFail(reason: String, line: Line) {
+        setStatus(line.name, "失效")
+        b.statusText.text = "${line.name}：$reason"
+        b.loading.visibility = View.VISIBLE
+        probe?.destroy()
+        probe = null
+        if (autoSwitchOn) nextUntriedLine()
     }
 
     private fun mimeFor(url: String): String {

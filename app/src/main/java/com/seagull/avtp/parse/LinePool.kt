@@ -40,14 +40,14 @@ data class Line(
 
 object LinePool {
 
-    /** 实测状态见 RECIPE_qige.md / lineprobe 报告 */
+    /** 实测可用的排前面：麒麟 + 4-TXNQ 出流最稳 */
     val DEFAULT: List<Line> = listOf(
-        Line("七哥解析", "https://jx.202617.xyz/tv.php?url=", "已实测可用 · 需点播放"),
-        Line("无损云", "https://free.maccms.xyz/?url=", "反调试+授权校验"),
-        Line("4-TXNQ", "https://bfq.txnp.cn/player?url=", "crypto-js 参数加密"),
-        Line("麒麟解析", "https://yparse.ik9.cc/index.php?url=", "待验"),
+        Line("麒麟解析", "https://yparse.ik9.cc/index.php?url=", "实测可出流"),
+        Line("4-TXNQ", "https://bfq.txnp.cn/player?url=", "实测可出流"),
+        Line("七哥解析", "https://jx.202617.xyz/tv.php?url=", "实测可出流·高频调用会被限"),
+        Line("冰豆", "https://bd.jx.cn/?url=", "实测可出流"),
+        Line("无损云", "https://free.maccms.xyz/?url=", "待验"),
         Line("fongmi", "https://json.fongmi.cc/web?url=", "待验"),
-        Line("冰豆", "https://bd.jx.cn/?url=", "疑似失效"),
     )
 }
 
