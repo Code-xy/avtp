@@ -16,6 +16,7 @@ import com.seagull.avtp.parse.Http
 import com.seagull.avtp.parse.Line
 import com.seagull.avtp.parse.LinePool
 import com.seagull.avtp.parse.WebViewProbe
+import com.shuyu.gsyvideoplayer.builder.GSYVideoOptionBuilder
 import com.shuyu.gsyvideoplayer.utils.OrientationUtils
 import okhttp3.Request
 import java.util.concurrent.TimeUnit
@@ -108,15 +109,33 @@ class PlayerActivity : AppCompatActivity() {
     private fun gsyPlay(stream: String, referer: String) {
         val p = b.avtpPlayer
         runCatching { p.release() }
-        p.setMapHeadData(hashMapOf("Referer" to referer, "User-Agent" to Http.UA))
-        if (!stream.lowercase().contains(".m3u8") && !stream.lowercase().contains(".mp4")) {
-            runCatching { p.setOverrideExtension("m3u8") }
-        } else {
-            runCatching { p.setOverrideExtension(null) }
+        // ★ header 必须走 GSYVideoOptionBuilder.setMapHeadData —— 它会把 mapHeadData 塞进
+        //   GSYModel 一路带到 Exo2 的 setDataSource()；单独调 player.setMapHeadData() 是无效的，
+        //   结果是流请求不带 Referer 直接 404。
+        // ★ 解析线路给的流地址常常没有 .m3u8 后缀（形如 /global?...&type=playlist），
+        //   必须用 setOverrideExtension 告诉播放器按 HLS 解。
+        val ext = if (stream.lowercase().contains(".m3u8")) "" else "m3u8"
+        try {
+            val builder = GSYVideoOptionBuilder()
+                .setUrl(stream)
+                .setCacheWithPlay(false)
+                .setVideoTitle(title)
+                .setMapHeadData(hashMapOf("Referer" to referer, "User-Agent" to Http.UA))
+                .setIsTouchWiget(true)
+                .setIsTouchWigetFull(true)
+                .setDismissControlTime(3000)
+                .setShowFullAnimation(true)
+                .setRotateViewAuto(false)
+                .setLockLand(false)
+                .setSeekOnStart(if (resumeMs > 0) resumeMs else 0)
+                .setNeedShowWifiTip(false)
+            if (ext.isNotEmpty()) builder.setOverrideExtension(ext)
+            builder.build(p)
+        } catch (e: Exception) {
+            Log.e(TAG, "GSY build 失败，退回 setUp()", e)
+            runCatching { p.setUp(stream, false, null, title) }
         }
-        p.setUp(stream, false, null, title)
         p.startPlayLogic()
-        if (resumeMs > 0) runCatching { p.seekTo(resumeMs) }
         b.avtpLoading.visibility = View.GONE
     }
 
