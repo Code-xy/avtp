@@ -9,6 +9,7 @@ import android.view.ViewGroup
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import com.seagull.avtp.browser.BrowserActivity
 import com.seagull.avtp.databinding.ActivityMainBinding
 import com.seagull.avtp.parse.LinePool
 import com.seagull.avtp.parse.Platform
@@ -43,8 +44,19 @@ class MainActivity : AppCompatActivity() {
 
         b.btnGo.setOnClickListener { go(0) }
 
+        b.btnIqiyi.setOnClickListener { openOfficial("iqiyi") }
+        b.btnYouku.setOnClickListener { openOfficial("youku") }
+        b.btnQq.setOnClickListener { openOfficial("qq") }
+
         buildLineList()
         handleShare(intent)
+    }
+
+    private fun openOfficial(platform: String) {
+        startActivity(
+            Intent(this, BrowserActivity::class.java)
+                .putExtra(BrowserActivity.EXTRA_PLATFORM, platform)
+        )
     }
 
     override fun onNewIntent(intent: Intent) {

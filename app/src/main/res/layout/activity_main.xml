@@ -30,6 +30,55 @@
             android:textColor="#8A8A8E"
             android:textSize="13sp" />
 
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="22dp"
+            android:text="官网直连（内置浏览器，边逛边解析）"
+            android:textColor="#8A8A8E"
+            android:textSize="11sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnIqiyi"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="爱奇艺"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/btnYouku"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:text="优酷"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/btnQq"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:text="腾讯视频"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="22dp"
+            android:text="或者直接粘贴链接"
+            android:textColor="#8A8A8E"
+            android:textSize="11sp" />
+
         <EditText
             android:id="@+id/urlInput"
             android:layout_width="match_parent"
