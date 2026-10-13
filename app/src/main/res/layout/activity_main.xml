@@ -34,7 +34,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="22dp"
-            android:text="官网直连（内置浏览器，边逛边解析）"
+            android:text="官网筛选 / 搜索（原生解析，不开网页）"
             android:textColor="#8A8A8E"
             android:textSize="11sp" />
 

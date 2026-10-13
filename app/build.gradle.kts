@@ -108,6 +108,7 @@ dependencies {
     implementation("androidx.recyclerview:recyclerview:1.3.2")
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("io.coil-kt:coil:2.7.0")
 
     val media3 = "1.4.1"
     implementation("androidx.media3:media3-exoplayer:$media3")

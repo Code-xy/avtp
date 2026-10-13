@@ -32,9 +32,10 @@
         </activity>
 
         <activity
-            android:name=".browser.BrowserActivity"
+            android:name=".browser.BrowseActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize"
+            android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.Avtp" />
 
         <activity

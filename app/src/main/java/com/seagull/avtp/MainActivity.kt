@@ -9,7 +9,7 @@ import android.view.ViewGroup
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import com.seagull.avtp.browser.BrowserActivity
+import com.seagull.avtp.browser.BrowseActivity
 import com.seagull.avtp.databinding.ActivityMainBinding
 import com.seagull.avtp.parse.LinePool
 import com.seagull.avtp.parse.Platform
@@ -44,18 +44,18 @@ class MainActivity : AppCompatActivity() {
 
         b.btnGo.setOnClickListener { go(0) }
 
-        b.btnIqiyi.setOnClickListener { openOfficial("iqiyi") }
-        b.btnYouku.setOnClickListener { openOfficial("youku") }
-        b.btnQq.setOnClickListener { openOfficial("qq") }
+        b.btnIqiyi.setOnClickListener { openBrowser("iqiyi") }
+        b.btnYouku.setOnClickListener { openBrowser("youku") }
+        b.btnQq.setOnClickListener { openBrowser("qq") }
 
         buildLineList()
         handleShare(intent)
     }
 
-    private fun openOfficial(platform: String) {
+    private fun openBrowser(platform: String) {
         startActivity(
-            Intent(this, BrowserActivity::class.java)
-                .putExtra(BrowserActivity.EXTRA_PLATFORM, platform)
+            Intent(this, BrowseActivity::class.java)
+                .putExtra(BrowseActivity.EXTRA_PLATFORM, platform)
         )
     }
 
