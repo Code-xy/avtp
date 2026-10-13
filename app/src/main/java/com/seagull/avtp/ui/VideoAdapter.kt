@@ -41,14 +41,14 @@ class VideoAdapter(private val onClick: (Item) -> Unit) :
     override fun getItemCount() = data.size
 
     override fun onBindViewHolder(holder: VH, position: Int) {
-        val it = data[position]
-        holder.b.title.text = it.title
-        if (it.cover.startsWith("http")) {
-            holder.b.cover.load(it.cover) { crossfade(true) }
+        val item = data[position]
+        holder.b.title.text = item.title
+        if (item.cover.startsWith("http")) {
+            holder.b.cover.load(item.cover) { crossfade(true) }
         } else {
             holder.b.cover.setImageDrawable(null)
         }
-        holder.itemView.setOnClickListener { onClick(it) }
+        holder.itemView.setOnClickListener { onClick(item) }
     }
 
     class VH(val b: ItemVideoBinding) : RecyclerView.ViewHolder(b.root)
