@@ -1,0 +1,190 @@
+# ══════════════════════════════════════════════════════════════════════
+#  可复用的安卓云端构建工作流
+#
+#  用法（同仓库）：   uses: ./.github/workflows/android-build.yml
+#  用法（跨仓库）：   uses: <owner>/<repo>/.github/workflows/android-build.yml@main
+#  调用方记得给权限与 secrets：permissions: contents: write / secrets: inherit
+#
+#  这套流程踩过的坑已经全部内置：
+#   1. 绝不在 if: 里引用 secrets（GitHub 会判整个工作流非法，症状是 run 名
+#      退化成文件路径 + 0 秒失败 + 零步骤记录）
+#   2. 无论成败都把日志和 APK 强推回 ci-logs 分支 —— 绕开 API 未认证限流
+#   3. 缓存 debug keystore —— 否则 runner 每次新建，APK 签名都不同、装不上去
+#   4. 构建用 set -o pipefail + tee —— 否则失败也算成功且丢日志
+# ══════════════════════════════════════════════════════════════════════
+name: Android Build (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      gradle-task:      { type: string, default: 'assembleRelease' }
+      gradle-version:   { type: string, default: '8.13' }
+      java-version:     { type: string, default: '17' }
+      sdk-packages:     { type: string, default: 'platform-tools platforms;android-36 build-tools;36.0.0' }
+      apk-glob:         { type: string, default: 'app/build/outputs/apk/release/*.apk' }
+      split-abi:        { type: string, default: 'false' }
+      abi-filters:      { type: string, default: '' }
+      version-name:     { type: string, default: '' }
+      version-code:     { type: string, default: '' }
+      logs-branch:      { type: string, default: 'ci-logs' }
+      release-on-tag:   { type: string, default: 'true' }
+    secrets:
+      KEYSTORE_BASE64:    { required: false }
+      KEYSTORE_PASSWORD:  { required: false }
+      KEY_ALIAS:          { required: false }
+      KEY_PASSWORD:       { required: false }
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 拉代码
+        uses: actions/checkout@v4
+
+      - name: 装 JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: ${{ inputs.java-version }}
+
+      - name: 准备 Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: ${{ inputs.gradle-version }}
+          cache-read-only: false
+
+      # 固定 debug keystore：runner 默认每次新建，导致每个 APK 签名不同、无法覆盖安装。
+      # 缓存住之后首次生成、后续复用，签名稳定。
+      - name: 恢复固定 debug keystore
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: android-debug-keystore-v1
+
+      - name: 环境诊断
+        run: |
+          SDK="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          {
+            echo "===== java =====";    java -version 2>&1
+            echo; echo "===== gradle ====="; gradle -v 2>&1
+            echo; echo "===== SDK=$SDK ====="
+            echo "--- platforms ---";   ls "$SDK/platforms" 2>&1
+            echo "--- build-tools ---"; ls "$SDK/build-tools" 2>&1
+            echo; echo "===== 输入 ====="
+            echo "task=${{ inputs.gradle-task }} splitAbi=${{ inputs.split-abi }}"
+            echo "abi=${{ inputs.abi-filters }} vName=${{ inputs.version-name }} vCode=${{ inputs.version-code }}"
+          } > diag.log 2>&1
+          echo "diag.log 已生成"
+
+      - name: 补齐 SDK 组件
+        env:
+          PKGS: ${{ inputs.sdk-packages }}
+        run: |
+          SDK="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          SM="$SDK/cmdline-tools/latest/bin/sdkmanager"
+          if [ -x "$SM" ]; then
+            yes | "$SM" --licenses > /dev/null 2>&1 || true
+            # shellcheck disable=SC2086
+            "$SM" $PKGS >> diag.log 2>&1 || echo "sdkmanager 部分组件安装失败，交给 AGP 自动下载" >> diag.log
+          else
+            echo "sdkmanager 不在 $SM，交给 AGP 自动下载" >> diag.log
+          fi
+
+      # secrets 必须经 env 传入，不能写在 if: 里
+      - name: 还原正式签名 keystore（可选）
+        env:
+          KS_B64: ${{ secrets.KEYSTORE_BASE64 }}
+        shell: bash
+        run: |
+          if [ -n "$KS_B64" ]; then
+            printf '%s' "$KS_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+            echo "OK 已还原正式签名 keystore"
+          else
+            echo "未配置 KEYSTORE_BASE64 -> 用 debug 签名出包"
+          fi
+
+      - name: 编译
+        shell: bash
+        env:
+          TASK: ${{ inputs.gradle-task }}
+          SPLIT_ABI: ${{ inputs.split-abi }}
+          ABI_FILTERS: ${{ inputs.abi-filters }}
+          V_NAME: ${{ inputs.version-name }}
+          V_CODE: ${{ inputs.version-code }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -o pipefail            # 少了这行，失败也会被 tee 吃掉算成功
+          G="./gradlew"; [ -x "$G" ] || G="gradle"
+          ARGS=""
+          case "$SPLIT_ABI" in true|True|1) ARGS="$ARGS -PsplitAbi=true";; esac
+          [ -n "$ABI_FILTERS" ] && ARGS="$ARGS -PabiFilters=$ABI_FILTERS"
+          [ -n "$V_NAME" ]      && ARGS="$ARGS -PvName=$V_NAME"
+          [ -n "$V_CODE" ]      && ARGS="$ARGS -PvCode=$V_CODE"
+          echo "执行: $G $TASK --no-daemon --stacktrace $ARGS"
+          $G "$TASK" --no-daemon --stacktrace $ARGS 2>&1 | tee build.log
+
+      - name: 上传构建日志（artifact）
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            build.log
+            diag.log
+          if-no-files-found: warn
+          retention-days: 7
+
+      # 日志和 APK 强推回独立分支：不依赖 API、不受限流、有固定下载链接
+      #   日志 https://github.com/<owner>/<repo>/raw/<logs-branch>/.ci/build.log
+      #   APK  https://github.com/<owner>/<repo>/raw/<logs-branch>/.ci/app-release.apk
+      - name: 回推日志与产物
+        if: always()
+        env:
+          LOGS_BRANCH: ${{ inputs.logs-branch }}
+          APK_GLOB: ${{ inputs.apk-glob }}
+        shell: bash
+        run: |
+          set +e
+          mkdir -p .ci
+          [ -f build.log ] && cp build.log .ci/ || echo "(无 build.log)" > .ci/build.log
+          [ -f diag.log ]  && cp diag.log  .ci/ || echo "(无 diag.log)"  > .ci/diag.log
+
+          APK=$(ls $APK_GLOB 2>/dev/null | head -1)
+          if [ -n "$APK" ]; then
+            cp "$APK" .ci/app-release.apk
+            INFO="$(basename "$APK")  $(stat -c%s "$APK") bytes  sha256=$(sha256sum "$APK" | cut -c1-32)"
+          else
+            INFO="(无 APK)"
+          fi
+
+          { echo "run_number=${{ github.run_number }}"
+            echo "head_sha=${{ github.sha }}"
+            echo "job_status=${{ job.status }}"
+            echo "apk=$INFO"; } > .ci/meta.txt
+
+          git config user.name  "ci-bot"
+          git config user.email "ci-bot@users.noreply.github.com"
+          git add -f .ci
+          git commit -m "ci: run ${{ github.run_number }} [${{ job.status }}]" || echo "无可提交内容"
+          git push --force origin "HEAD:refs/heads/$LOGS_BRANCH"
+
+      - name: 上传 APK（artifact）
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-${{ github.run_number }}
+          path: ${{ inputs.apk-glob }}
+          if-no-files-found: error
+
+      - name: 打 tag 时发 Release
+        if: ${{ success() && startsWith(github.ref, 'refs/tags/v') && inputs.release-on-tag == 'true' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ inputs.apk-glob }}
+          generate_release_notes: true

@@ -1,0 +1,53 @@
+# 本仓库的构建入口。真正的逻辑在 android-build.yml（可复用模板）。
+name: Build APK
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'          # 纯文档/忽略规则改动不必出包
+  workflow_dispatch:
+    inputs:
+      gradle_task:
+        description: '构建任务'
+        type: choice
+        default: assembleRelease
+        options: [assembleRelease, assembleDebug, bundleRelease]
+      split_abi:
+        description: '按 ABI 分包（体积更小，但每台机器只能装对应的那个包）'
+        type: boolean
+        default: false
+      abi_filters:
+        description: '限制 ABI，逗号分隔；留空=全部。例：arm64-v8a,armeabi-v7a'
+        type: string
+        default: ''
+      version_name:
+        description: '覆盖 versionName；留空=用 build.gradle 里的'
+        type: string
+        default: ''
+      version_code:
+        description: '覆盖 versionCode；留空=用 build.gradle 里的'
+        type: string
+        default: ''
+      release_on_tag:
+        description: '打 v* tag 时自动发 Release'
+        type: boolean
+        default: true
+
+permissions:
+  contents: write          # 回推 ci-logs 分支需要
+
+jobs:
+  build:
+    uses: ./.github/workflows/android-build.yml
+    secrets: inherit
+    with:
+      gradle-task:    ${{ inputs.gradle_task || 'assembleRelease' }}
+      split-abi:      ${{ inputs.split_abi == true && 'true' || 'false' }}
+      abi-filters:    ${{ inputs.abi_filters || '' }}
+      version-name:   ${{ inputs.version_name || '' }}
+      version-code:   ${{ inputs.version_code || '' }}
+      release-on-tag: ${{ inputs.release_on_tag == false && 'false' || 'true' }}
