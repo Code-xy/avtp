@@ -52,6 +52,24 @@ GET  →  200 application/vnd.apple.mpegurl   #EXTM3U  90478B   ✅ 真流
 2. 流地址不能缓存（`t=` 时间令牌几十秒过期）
 3. WebView 与 ExoPlayer 必须共享 CookieJar
 
+## 原生筛选 + 搜索（不开网页）
+
+数据全部来自各平台自己的 JSON 接口，`org.json` 直接解析，不加载任何官网页面：
+
+| 平台 | 筛选 | 搜索 | 状态 |
+|---|---|---|---|
+| 爱奇艺 | `pcw-api.iqiyi.com/search/recommend/list?channel_id=&page_id=&ret_num=` | `search.video.iqiyi.com/o?if=html5&key=&pageNum=&pageSize=` | ✅ 实测通 |
+| 优酷 | 搜索接口自带 `pageData.filter` | `search.youku.com/api/search?keyword=&page=` | ✅ 实测通 |
+| 腾讯 | — | — | ⏳ 待接（详情 `node.video.qq.com/x/api/float_vinfo2?cid=` 已通） |
+
+要点：
+
+- **爱奇艺频道接口直接给 `playUrl`（就是 `v_xxx.html` 播放页）**，拿来就能丢给解析线路，最省事。
+- 爱奇艺搜索给的是 `albumLink`（`a_xxx.html` 专辑页），部分线路不认，所以优先用频道接口的结果。
+- **优酷搜索结果藏在 `pageComponentList[].componentMap[*].data[]`**，条目有 `videoId`，
+  拼 `https://v.youku.com/v_show/id_<videoId>.html` 即可。注意首屏多是预告片/短视频模块。
+- 腾讯搜索页面是 SPA，接口走 `pbaccess.video.qq.com` 带签名，暂时留空。
+
 ## 编译
 
 云端构建：push 到 main → Actions 出 APK（`.github/workflows/build.yml` → 可复用模板 `android-build.yml`）。
