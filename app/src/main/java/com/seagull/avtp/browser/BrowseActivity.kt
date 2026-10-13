@@ -182,6 +182,7 @@ class BrowseActivity : AppCompatActivity() {
                           else PlatformApi.iqiyiChannel(channelId, p)
         Platform.YOUKU -> PlatformApi.youkuSearch(if (keyword.isNotBlank()) keyword else channelWord, page = p)
         Platform.QQ -> if (p == 1) PlatformApi.tencentChannel(channelSlug) else emptyList()
+        else -> emptyList()
     }
 
     private fun channelLabel(): String = when (platform) {
