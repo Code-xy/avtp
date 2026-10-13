@@ -13,6 +13,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.GridLayoutManager
+import com.seagull.avtp.R
 import com.seagull.avtp.api.Item
 import com.seagull.avtp.api.PlatformApi
 import com.seagull.avtp.databinding.ActivityBrowseBinding
@@ -94,15 +95,15 @@ class BrowseActivity : AppCompatActivity() {
         b.avtpTabQq.isSelected = p == Platform.QQ
 
         val list: List<Pair<String, String>> = when (p) {
-            Platform.IQIYI -> iqiyiChannels
             Platform.YOUKU -> youkuWords.map { it to it }
             Platform.QQ -> qqChannels
+            else -> iqiyiChannels
         }
         buildChips(list)
         when (p) {
-            Platform.IQIYI -> { channelId = "1"; loadIqiyiChannel() }
             Platform.YOUKU -> { channelWord = "电视剧"; loadYouku(null) }
             Platform.QQ -> { channelSlug = "tv"; loadTencent() }
+            else -> { channelId = "1"; loadIqiyiChannel() }
         }
     }
 
@@ -116,9 +117,9 @@ class BrowseActivity : AppCompatActivity() {
             btn.setOnClickListener {
                 btns.forEachIndexed { j, x -> x.isSelected = (j == i) }
                 when (platform) {
-                    Platform.IQIYI -> { channelId = value; loadIqiyiChannel() }
                     Platform.YOUKU -> { channelWord = value; loadYouku(null) }
                     Platform.QQ -> { channelSlug = value; loadTencent() }
+                    else -> { channelId = value; loadIqiyiChannel() }
                 }
             }
             btns.add(btn)
@@ -163,8 +164,8 @@ class BrowseActivity : AppCompatActivity() {
         busy("搜索「$kw」…")
         Thread {
             val list = when (platform) {
-                Platform.IQIYI -> PlatformApi.iqiyiSearch(kw, 1)
                 Platform.YOUKU -> PlatformApi.youkuSearch(kw, 1)
+                Platform.IQIYI -> PlatformApi.iqiyiSearch(kw, 1)
                 else -> emptyList()
             }
             val msg = when {
