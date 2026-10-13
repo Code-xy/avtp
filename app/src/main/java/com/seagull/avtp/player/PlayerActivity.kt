@@ -1,6 +1,7 @@
 package com.seagull.avtp.player
 
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
@@ -68,17 +69,18 @@ class PlayerActivity : AppCompatActivity() {
 
     // ── 取流 ────────────────────────────────────────────────────────────
 
-    private fun startResolve() {
+    private fun startResolve(reason: String = "首次") {
         probe?.destroy()
         val line = lines[lineIndex]
         tried.add(line.name)
+        Log.i(TAG, "resolve[$reason] line=${line.name} tried=${tried}")
         setStatus(line.name, "解析中…")
         b.loading.visibility = View.VISIBLE
         b.statusText.text = "正在解析：${line.name}"
 
         val p = WebViewProbe(
             onFound = { stream -> runOnUiThread { onStreamFound(stream, line) } },
-            onFail = { reason -> runOnUiThread { onResolveFail(reason, line) } },
+            onFail = { r -> runOnUiThread { onResolveFail(r, line) } },
             onProgress = { stage ->
                 runOnUiThread {
                     if (b.loading.visibility == View.VISIBLE) {
@@ -92,18 +94,19 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun onStreamFound(stream: String, line: Line) {
+        Log.i(TAG, "出流[${line.name}] $stream")
         b.statusText.text = "${line.name} 已出流，校验播放头…"
-        // 各线路对 Referer 的要求不一样：有的认自己域名，有的认原站，有的完全不要。
-        // 拿到的流地址先挨个试，(能拉到 #EXTM3U 头) 的那个才拿去播。
         Thread {
             val working = pickReferer(stream, line)
             runOnUiThread {
                 if (working == null) {
+                    Log.w(TAG, "预检失败[${line.name}]：所有 Referer 都拿不到 #EXTM3U")
                     setStatus(line.name, "流不可播")
                     b.loading.visibility = View.VISIBLE
                     b.statusText.text = "${line.name}：流地址拿回来了但拉不到播放列表"
-                    if (autoSwitchOn) nextUntriedLine()
+                    if (autoSwitchOn) nextUntriedLine("预检失败")
                 } else {
+                    Log.i(TAG, "预检通过[${line.name}] referer='$working'")
                     setStatus(line.name, "可用")
                     play(stream, line, working)
                 }
@@ -118,19 +121,35 @@ class PlayerActivity : AppCompatActivity() {
         candidates.add("")
         platformOrigin()?.let { candidates.add(it) }
         candidates.add("https://jx.202617.xyz/")
-        for (r in candidates) if (loadsPlaylist(stream, r)) return r
+        for (r in candidates) {
+            val ok = loadsPlaylist(stream, r)
+            Log.i(TAG, "  预检 referer='$r' -> $ok")
+            if (ok) return r
+        }
         return null
+    }
+
+    /** 预检用短超时客户端 —— 不能让几个候选 Referer 把 40s 探针超时耗穿 */
+    private val aliveClient by lazy {
+        Http.client.newBuilder()
+            .connectTimeout(6, TimeUnit.SECONDS)
+            .readTimeout(6, TimeUnit.SECONDS)
+            .build()
     }
 
     private fun loadsPlaylist(url: String, referer: String): Boolean = try {
         val rb = Request.Builder().url(url).header("User-Agent", Http.UA)
         if (referer.isNotBlank()) rb.header("Referer", referer)
-        Http.client.newCall(rb.build()).execute().use { resp ->
+        aliveClient.newCall(rb.build()).execute().use { resp ->
             if (resp.isSuccessful) {
                 resp.body?.string().orEmpty().trimStart().startsWith("#EXTM3U")
-            } else false
+            } else {
+                Log.i(TAG, "  预检 HTTP ${resp.code}")
+                false
+            }
         }
     } catch (e: Exception) {
+        Log.i(TAG, "  预检异常 ${e.message}")
         false
     }
 
@@ -166,7 +185,7 @@ class PlayerActivity : AppCompatActivity() {
         b.loading.visibility = View.VISIBLE
         probe?.destroy()
         probe = null
-        if (autoSwitchOn) nextUntriedLine()
+        if (autoSwitchOn) nextUntriedLine("探针失败")
     }
 
     private fun mimeFor(url: String): String {
@@ -212,18 +231,18 @@ class PlayerActivity : AppCompatActivity() {
         override fun onPlayerError(error: PlaybackException) {
             resumeMs = player?.currentPosition ?: resumeMs
             val name = lines.getOrNull(lineIndex)?.name.orEmpty()
+            Log.e(TAG, "播放错误[$name] ${error.errorCodeName} pos=$resumeMs", error)
             b.loading.visibility = View.VISIBLE
             toast("播放出错：${error.errorCodeName}")
             // 先原线路重试一次（流地址带了短时令牌，常是偶发取流不及时），再考虑换线路
             if (name.isNotBlank() && retried.add(name)) {
                 b.statusText.text = "$name 播放出错，重试中…"
-                retried.add(name)
-                startResolve()
+                startResolve("重试")
                 return
             }
             setStatus(name, "播放失败")
             b.statusText.text = "播放出错：${error.errorCodeName}"
-            if (autoSwitchOn) nextUntriedLine()
+            if (autoSwitchOn) nextUntriedLine("播放错误")
         }
     }
 
@@ -241,16 +260,18 @@ class PlayerActivity : AppCompatActivity() {
         startResolve()
     }
 
-    private fun nextUntriedLine() {
+    private fun nextUntriedLine(why: String) {
+        Log.w(TAG, "换线路[$why] 已试=${tried}")
         val next = lines.indices.firstOrNull { lines[it].name !in tried }
         if (next == null) {
             b.loading.visibility = View.VISIBLE
             b.statusText.text = "所有线路都失败了（共 ${lines.size} 条）"
+            Log.w(TAG, "全部线路失败")
             return
         }
         lineIndex = next
         renderPanel()
-        startResolve()
+        startResolve("换线:$why")
     }
 
     private fun togglePanel() {
@@ -312,6 +333,7 @@ class PlayerActivity : AppCompatActivity() {
         const val EXTRA_VIDEO_URL = "video_url"
         const val EXTRA_TITLE = "title"
         const val EXTRA_LINE_INDEX = "line_index"
+        const val TAG = "AvtpPlay"
         private const val TIMEOUT_MS = 40_000L
     }
 }
