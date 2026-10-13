@@ -1,0 +1,55 @@
+===== java =====
+openjdk version "17.0.20" 2026-07-21 LTS
+OpenJDK Runtime Environment Zulu17.68+19-CRaC-CA (build 17.0.20+8-LTS)
+OpenJDK 64-Bit Server VM Zulu17.68+19-CRaC-CA (build 17.0.20+8-LTS, mixed mode, sharing)
+
+===== gradle =====
+
+------------------------------------------------------------
+Gradle 8.13
+------------------------------------------------------------
+
+Build time:    2025-02-25 09:22:14 UTC
+Revision:      073314332697ba45c16c0a0ce1891fa6794179ff
+
+Kotlin:        2.0.21
+Groovy:        3.0.22
+Ant:           Apache Ant(TM) version 1.10.15 compiled on August 25 2024
+Launcher JVM:  17.0.20 (Azul Systems, Inc. 17.0.20+8-LTS)
+Daemon JVM:    /opt/hostedtoolcache/Java_Zulu_jdk/17.0.20-8/x64 (no JDK specified, using current Java home)
+OS:            Linux 6.17.0-1022-azure amd64
+
+
+===== SDK=/usr/local/lib/android/sdk =====
+--- platforms ---
+android-34
+android-34-ext10
+android-34-ext11
+android-34-ext12
+android-34-ext8
+android-35
+android-35-ext14
+android-35-ext15
+android-36
+android-36-ext18
+android-36-ext19
+android-36.1
+android-37.0
+android-37.1
+android-37.2
+android-37.2-beta1
+android-37.2-beta2
+android-37.2-beta3
+--- build-tools ---
+34.0.0
+35.0.0
+35.0.1
+36.0.0
+36.1.0
+37.0.0
+
+===== 输入 =====
+task=assembleRelease splitAbi=false
+abi= vName= vCode=
+Loading package information...                                                  Loading local repository...                                                     [                                       ] 3% Loading local repository...        [                                       ] 3% Fetch remote repository...         [=                                      ] 3% Fetch remote repository...         [=                                      ] 4% Fetch remote repository...         [=                                      ] 5% Fetch remote repository...         [==                                     ] 5% Fetch remote repository...         [==                                     ] 6% Fetch remote repository...         [==                                     ] 7% Fetch remote repository...         [==                                     ] 7% Computing updates...               [===                                    ] 8% Computing updates...               [===                                    ] 10% Computing updates...              [=======================================] 100% Computing updates...             
+
