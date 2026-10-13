@@ -7,17 +7,17 @@
     <!-- WebView 抓流探针：垫在最底层，被上面的播放器盖住。
          必须给足尺寸 —— 1x1 会让部分播放器页的 JS 布局/检测失效。 -->
     <FrameLayout
-        android:id="@+id/probeHost"
+        android:id="@+id/avtpProbeHost"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
     <com.shuyu.gsyvideoplayer.video.StandardGSYVideoPlayer
-        android:id="@+id/player"
+        android:id="@+id/avtpPlayer"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
     <ProgressBar
-        android:id="@+id/bar"
+        android:id="@+id/avtpBar"
         style="?android:attr/progressBarStyleHorizontal"
         android:layout_width="match_parent"
         android:layout_height="3dp"
@@ -40,7 +40,7 @@
         android:paddingRight="6dp">
 
         <Button
-            android:id="@+id/btnPrev"
+            android:id="@+id/avtpBtnPrev"
             android:layout_width="wrap_content"
             android:layout_height="30dp"
             android:background="#00000000"
@@ -52,7 +52,7 @@
             android:textSize="11sp" />
 
         <Button
-            android:id="@+id/btnNext"
+            android:id="@+id/avtpBtnNext"
             android:layout_width="wrap_content"
             android:layout_height="30dp"
             android:background="#00000000"
@@ -64,7 +64,7 @@
             android:textSize="11sp" />
 
         <Button
-            android:id="@+id/btnEps"
+            android:id="@+id/avtpBtnEps"
             android:layout_width="wrap_content"
             android:layout_height="30dp"
             android:background="#00000000"
@@ -78,7 +78,7 @@
 
     <!-- 加载/状态 -->
     <LinearLayout
-        android:id="@+id/loading"
+        android:id="@+id/avtpLoading"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
@@ -92,7 +92,7 @@
             android:indeterminateTint="#4DA3FF" />
 
         <TextView
-            android:id="@+id/statusText"
+            android:id="@+id/avtpStatus"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="14dp"
@@ -103,7 +103,7 @@
 
     <!-- 选集面板 -->
     <LinearLayout
-        android:id="@+id/epsPanel"
+        android:id="@+id/avtpEpsPanel"
         android:layout_width="match_parent"
         android:layout_height="260dp"
         android:layout_gravity="bottom"
@@ -114,7 +114,7 @@
         android:visibility="gone">
 
         <TextView
-            android:id="@+id/epsTitle"
+            android:id="@+id/avtpEpsTitle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:paddingLeft="14dp"
@@ -129,7 +129,7 @@
             android:layout_height="match_parent">
 
             <LinearLayout
-                android:id="@+id/epsList"
+                android:id="@+id/avtpEpsList"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
@@ -140,7 +140,7 @@
 
     <!-- 线路面板 -->
     <LinearLayout
-        android:id="@+id/linePanel"
+        android:id="@+id/avtpLinePanel"
         android:layout_width="248dp"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
@@ -153,7 +153,7 @@
         android:visibility="gone">
 
         <TextView
-            android:id="@+id/currentLineText"
+            android:id="@+id/avtpCurrentLine"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:paddingLeft="14dp"
@@ -164,14 +164,14 @@
             android:textSize="11sp" />
 
         <LinearLayout
-            android:id="@+id/lineList"
+            android:id="@+id/avtpLineList"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical" />
     </LinearLayout>
 
     <Button
-        android:id="@+id/btnLines"
+        android:id="@+id/avtpBtnLines"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"

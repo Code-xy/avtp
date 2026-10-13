@@ -68,10 +68,10 @@ class PlayerActivity : AppCompatActivity() {
         if (videoUrl.isBlank()) { finish(); return }
 
         setupPlayer()
-        b.btnLines.setOnClickListener { toggleLinePanel() }
-        b.btnEps.setOnClickListener { toggleEpsPanel() }
-        b.btnPrev.setOnClickListener { gotoEpisode(epIndex - 1) }
-        b.btnNext.setOnClickListener { gotoEpisode(epIndex + 1) }
+        b.avtpBtnLines.setOnClickListener { toggleLinePanel() }
+        b.avtpBtnEps.setOnClickListener { toggleEpsPanel() }
+        b.avtpBtnPrev.setOnClickListener { gotoEpisode(epIndex - 1) }
+        b.avtpBtnNext.setOnClickListener { gotoEpisode(epIndex + 1) }
         renderPanel()
         loadEpisodes()
         startResolve("首次")
@@ -80,17 +80,17 @@ class PlayerActivity : AppCompatActivity() {
     // ── 播放器 ──────────────────────────────────────────────────────────
 
     private fun setupPlayer() {
-        b.player.setIsTouchWiget(true)
-        b.player.setIsTouchWigetFull(true)
-        b.player.setDismissControlTime(3000)
-        b.player.setShowFullAnimation(true)
-        b.player.setRotateViewAuto(false)
-        b.player.setLockLand(false)
-        b.player.getTitleTextView().text = title
+        b.avtpPlayer.setIsTouchWiget(true)
+        b.avtpPlayer.setIsTouchWigetFull(true)
+        b.avtpPlayer.setDismissControlTime(3000)
+        b.avtpPlayer.setShowFullAnimation(true)
+        b.avtpPlayer.setRotateViewAuto(false)
+        b.avtpPlayer.setLockLand(false)
+        b.avtpPlayer.getTitleTextView().text = title
 
-        orientationUtils = OrientationUtils(this, b.player).apply { setEnable(true) }
-        b.player.getFullscreenButton()?.setOnClickListener { orientationUtils?.resolveByClick() }
-        b.player.getBackButton()?.setOnClickListener { handleBack() }
+        orientationUtils = OrientationUtils(this, b.avtpPlayer).apply { setEnable(true) }
+        b.avtpPlayer.getFullscreenButton()?.setOnClickListener { orientationUtils?.resolveByClick() }
+        b.avtpPlayer.getBackButton()?.setOnClickListener { handleBack() }
     }
 
     private fun handleBack() {
@@ -106,7 +106,7 @@ class PlayerActivity : AppCompatActivity() {
      *   播放器光看 URI 推断不出类型，必须显式告诉它这是 HLS。
      */
     private fun gsyPlay(stream: String, referer: String) {
-        val p = b.player
+        val p = b.avtpPlayer
         runCatching { p.release() }
         p.setMapHeadData(hashMapOf("Referer" to referer, "User-Agent" to Http.UA))
         if (!stream.lowercase().contains(".m3u8") && !stream.lowercase().contains(".mp4")) {
@@ -117,7 +117,7 @@ class PlayerActivity : AppCompatActivity() {
         p.setUp(stream, false, null, title)
         p.startPlayLogic()
         if (resumeMs > 0) runCatching { p.seekTo(resumeMs) }
-        b.loading.visibility = View.GONE
+        b.avtpLoading.visibility = View.GONE
     }
 
     // ── 取流 ────────────────────────────────────────────────────────────
@@ -128,33 +128,33 @@ class PlayerActivity : AppCompatActivity() {
         tried.add(line.name)
         Log.i(TAG, "resolve[$reason] line=${line.name} tried=$tried")
         setStatus(line.name, "解析中…")
-        b.loading.visibility = View.VISIBLE
-        b.statusText.text = "正在解析：${line.name}"
+        b.avtpLoading.visibility = View.VISIBLE
+        b.avtpStatus.text = "正在解析：${line.name}"
 
         val p = WebViewProbe(
             onFound = { stream -> runOnUiThread { onStreamFound(stream, line) } },
             onFail = { r -> runOnUiThread { onResolveFail(r, line) } },
             onProgress = { stage ->
                 runOnUiThread {
-                    if (b.loading.visibility == View.VISIBLE) b.statusText.text = "${line.name} · $stage"
+                    if (b.avtpLoading.visibility == View.VISIBLE) b.avtpStatus.text = "${line.name} · $stage"
                 }
             },
         )
         probe = p
-        p.start(b.probeHost, line.buildUrl(videoUrl), line.referer, TIMEOUT_MS)
+        p.start(b.avtpProbeHost, line.buildUrl(videoUrl), line.referer, TIMEOUT_MS)
     }
 
     private fun onStreamFound(stream: String, line: Line) {
         Log.i(TAG, "出流[${line.name}] $stream")
-        b.statusText.text = "${line.name} 已出流，校验播放头…"
+        b.avtpStatus.text = "${line.name} 已出流，校验播放头…"
         Thread {
             val working = pickReferer(stream, line)
             runOnUiThread {
                 if (working == null) {
                     Log.w(TAG, "预检失败[${line.name}]")
                     setStatus(line.name, "流不可播")
-                    b.loading.visibility = View.VISIBLE
-                    b.statusText.text = "${line.name}：流拿回来了但拉不到播放列表"
+                    b.avtpLoading.visibility = View.VISIBLE
+                    b.avtpStatus.text = "${line.name}：流拿回来了但拉不到播放列表"
                     if (autoSwitchOn) nextUntriedLine("预检失败")
                 } else {
                     Log.i(TAG, "预检通过[${line.name}] referer='$working'")
@@ -198,8 +198,8 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun onResolveFail(reason: String, line: Line) {
         setStatus(line.name, "失效")
-        b.loading.visibility = View.VISIBLE
-        b.statusText.text = "${line.name}：$reason"
+        b.avtpLoading.visibility = View.VISIBLE
+        b.avtpStatus.text = "${line.name}：$reason"
         probe?.destroy()
         probe = null
         if (autoSwitchOn) nextUntriedLine("探针失败")
@@ -209,8 +209,8 @@ class PlayerActivity : AppCompatActivity() {
         Log.w(TAG, "换线路[$why] 已试=$tried")
         val next = lines.indices.firstOrNull { lines[it].name !in tried }
         if (next == null) {
-            b.loading.visibility = View.VISIBLE
-            b.statusText.text = "所有线路都失败了（共 ${lines.size} 条）"
+            b.avtpLoading.visibility = View.VISIBLE
+            b.avtpStatus.text = "所有线路都失败了（共 ${lines.size} 条）"
             return
         }
         lineIndex = next
@@ -221,7 +221,7 @@ class PlayerActivity : AppCompatActivity() {
     // ── 选集 ────────────────────────────────────────────────────────────
 
     private fun loadEpisodes() {
-        if (albumId.isBlank()) { b.btnEps.visibility = View.GONE; return }
+        if (albumId.isBlank()) { b.avtpBtnEps.visibility = View.GONE; return }
         Log.i(TAG, "拉选集 albumId=$albumId")
         Thread {
             val eps = PlatformApi.iqiyiEpisodes(albumId)
@@ -229,9 +229,9 @@ class PlayerActivity : AppCompatActivity() {
                 episodes = eps
                 Log.i(TAG, "选集 ${eps.size} 集")
                 if (eps.isEmpty()) {
-                    b.btnEps.visibility = View.GONE
+                    b.avtpBtnEps.visibility = View.GONE
                 } else {
-                    b.btnEps.visibility = View.VISIBLE
+                    b.avtpBtnEps.visibility = View.VISIBLE
                     // 当前播放的是第几集
                     epIndex = eps.indexOfFirst { it.url == videoUrl }
                         .let { if (it >= 0) it else eps.indexOfFirst { sameTv(it.url, videoUrl) } }
@@ -257,28 +257,28 @@ class PlayerActivity : AppCompatActivity() {
         videoUrl = ep.url
         resumeMs = 0
         tried.clear(); retried.clear()
-        b.linePanel.visibility = View.GONE; linePanelOpen = false
-        b.epsPanel.visibility = View.GONE
+        b.avtpLinePanel.visibility = View.GONE; linePanelOpen = false
+        b.avtpEpsPanel.visibility = View.GONE
         paintEps()
         startResolve("选集")
     }
 
     private fun toggleEpsPanel() {
         if (episodes.isEmpty()) { toast("没有拿到选集列表"); return }
-        val show = b.epsPanel.visibility != View.VISIBLE
-        b.epsPanel.visibility = if (show) View.VISIBLE else View.GONE
-        b.linePanel.visibility = View.GONE; linePanelOpen = false
+        val show = b.avtpEpsPanel.visibility != View.VISIBLE
+        b.avtpEpsPanel.visibility = if (show) View.VISIBLE else View.GONE
+        b.avtpLinePanel.visibility = View.GONE; linePanelOpen = false
     }
 
     private fun paintEps() {
-        b.btnPrev.visibility = if (episodes.isEmpty()) View.GONE else View.VISIBLE
-        b.btnNext.visibility = if (episodes.isEmpty()) View.GONE else View.VISIBLE
-        b.btnPrev.alpha = if (epIndex > 0) 1f else 0.4f
-        b.btnNext.alpha = if (epIndex in 0 until episodes.size - 1) 1f else 0.4f
-        b.epsTitle.text = "选集 · 共 ${episodes.size} 集" +
+        b.avtpBtnPrev.visibility = if (episodes.isEmpty()) View.GONE else View.VISIBLE
+        b.avtpBtnNext.visibility = if (episodes.isEmpty()) View.GONE else View.VISIBLE
+        b.avtpBtnPrev.alpha = if (epIndex > 0) 1f else 0.4f
+        b.avtpBtnNext.alpha = if (epIndex in 0 until episodes.size - 1) 1f else 0.4f
+        b.avtpEpsTitle.text = "选集 · 共 ${episodes.size} 集" +
             if (epIndex >= 0) " · 正在播放第 ${episodes[epIndex].order} 集" else ""
 
-        b.epsList.removeAllViews()
+        b.avtpEpsList.removeAllViews()
         val perRow = 5
         var row: LinearLayout? = null
         episodes.forEachIndexed { i, ep ->
@@ -288,7 +288,7 @@ class PlayerActivity : AppCompatActivity() {
                     layoutParams = LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
                 }
-                b.epsList.addView(row)
+                b.avtpEpsList.addView(row)
             }
             val cur = i == epIndex
             val btn = Button(this).apply {
@@ -313,7 +313,7 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun toggleLinePanel() {
         linePanelOpen = !linePanelOpen
-        b.epsPanel.visibility = View.GONE
+        b.avtpEpsPanel.visibility = View.GONE
         renderPanel()
     }
 
@@ -327,10 +327,10 @@ class PlayerActivity : AppCompatActivity() {
         startResolve("手选线路")
     }
 
-    private fun currentPosition(): Long = runCatching { b.player.currentPositionWhenPlaying }.getOrDefault(resumeMs)
+    private fun currentPosition(): Long = runCatching { b.avtpPlayer.currentPositionWhenPlaying }.getOrDefault(resumeMs)
 
     private fun renderPanel() {
-        b.lineList.removeAllViews()
+        b.avtpLineList.removeAllViews()
         lines.forEachIndexed { i, line ->
             val st = lineStatus[line.name].orEmpty()
             val active = i == lineIndex
@@ -347,10 +347,10 @@ class PlayerActivity : AppCompatActivity() {
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
                 setOnClickListener { switchLine(i) }
             }
-            b.lineList.addView(tv)
+            b.avtpLineList.addView(tv)
         }
-        b.linePanel.visibility = if (linePanelOpen) View.VISIBLE else View.GONE
-        b.currentLineText.text = lines.getOrNull(lineIndex)?.name.orEmpty()
+        b.avtpLinePanel.visibility = if (linePanelOpen) View.VISIBLE else View.GONE
+        b.avtpCurrentLine.text = lines.getOrNull(lineIndex)?.name.orEmpty()
     }
 
     private fun setStatus(name: String, s: String) {
@@ -363,14 +363,14 @@ class PlayerActivity : AppCompatActivity() {
     override fun onStop() {
         super.onStop()
         resumeMs = currentPosition()
-        runCatching { b.player.onVideoPause() }
+        runCatching { b.avtpPlayer.onVideoPause() }
     }
 
     override fun onDestroy() {
         super.onDestroy()
         probe?.destroy(); probe = null
         runCatching { orientationUtils?.releaseListener() }
-        runCatching { b.player.release() }
+        runCatching { b.avtpPlayer.release() }
     }
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
