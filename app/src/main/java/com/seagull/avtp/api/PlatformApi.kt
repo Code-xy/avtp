@@ -190,31 +190,32 @@ object PlatformApi {
 
     /**
      * 腾讯频道列表。
-     * v.qq.com/channel/{tv,movie,variety,anime,documentary} 是 SSR 页面，
-     * 内联脚本里是一堆 JS 对象字面量，形如：
-     *   ...sourceTitle:"伟大的长征",...coverPic:"https://...",...cutJumpUrl:"https://v.qq.com/x/cover/<cid>.html"
-     * 所以按 cutJumpUrl 切段，往每段前面找标题和封面。
+     * v.qq.com/channel/{tv,movie,variety,cartoon,doco} 是 SSR 页面，
+     * 内联脚本里是一堆 JS 对象字面量，每个条目含 cid / mzTitle / coverPic。
+     * ★ 不同频道的**键顺序不一样**（tv 里 cutJumpUrl 在末尾，综艺/纪录片里不是），
+     *   所以不能按 cutJumpUrl 切段 —— 改成按 `cid:"` 切，同一段里捞字段。
      * 这是兜底方案（搜索接口 pbaccess 带签名，没能免签调通）。
      */
     fun tencentChannel(slug: String): List<Item> {
         val html = get("https://v.qq.com/channel/$slug", "https://v.qq.com/") ?: return emptyList()
-        val parts = html.split("cutJumpUrl:\"")
+        val parts = html.split("cid:\"")
         if (parts.size < 2) return emptyList()
 
-        val rxCid = Regex("""^(https://v\.qq\.com/x/cover/[0-9a-zA-Z]+\.html)""")
-        val rxTitle = Regex("""(?:mzTitle|sourceTitle|title):"([^"]{1,60})"""")
+        val rxCid = Regex("""^([0-9a-zA-Z]{8,})"""")
+        val rxTitle = Regex("""(?:mzTitle|sourceTitle):"([^"]{1,60})"""")
         val rxCover = Regex("""coverPic:"([^"]+)"""")
 
         val out = ArrayList<Item>()
+        val seen = HashSet<String>()
         for (i in 1 until parts.size) {
-            val url = rxCid.find(parts[i])?.groupValues?.get(1) ?: continue
-            val back = parts[i - 1].takeLast(5000)
-            val title = rxTitle.findAll(back).lastOrNull()?.groupValues?.get(1).orEmpty()
-            if (title.isBlank()) continue
-            val cover = rxCover.findAll(back).lastOrNull()?.groupValues?.get(1).orEmpty()
-            out.add(Item(title, cover, url))
+            val seg = parts[i].take(3000)
+            val cid = rxCid.find(seg)?.groupValues?.get(1) ?: continue
+            val title = rxTitle.find(seg)?.groupValues?.get(1) ?: continue
+            val url = "https://v.qq.com/x/cover/$cid.html"
+            if (!seen.add(url)) continue
+            out.add(Item(title, rxCover.find(seg)?.groupValues?.get(1).orEmpty(), url))
         }
-        return out.distinctBy { it.pageUrl }
+        return out
     }
 
     fun tencentSearch(keyword: String, page: Int = 1): List<Item> = emptyList()
