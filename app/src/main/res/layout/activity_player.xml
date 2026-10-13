@@ -5,20 +5,22 @@
     android:layout_height="match_parent"
     android:background="#000000">
 
+    <!-- WebView 探针挂载点：放在最底层、全屏大小。
+         必须给足尺寸 —— 1x1 的 WebView 会让部分播放器页的 JS 布局/检测失效，
+         页面被上层的 PlayerView 完全盖住，用户看不到。 -->
+    <FrameLayout
+        android:id="@+id/probeHost"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
     <androidx.media3.ui.PlayerView
         android:id="@+id/playerView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:background="#FF000000"
         app:use_controller="true"
         app:show_buffering="when_playing"
         app:resize_mode="fit" />
-
-    <!-- 1x1 离屏 WebView 探针挂载点 -->
-    <FrameLayout
-        android:id="@+id/probeHost"
-        android:layout_width="1dp"
-        android:layout_height="1dp"
-        android:layout_gravity="top|start" />
 
     <TextView
         android:id="@+id/titleText"

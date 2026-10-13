@@ -76,6 +76,13 @@ class PlayerActivity : AppCompatActivity() {
         val p = WebViewProbe(
             onFound = { stream -> runOnUiThread { onStreamFound(stream, line) } },
             onFail = { reason -> runOnUiThread { onResolveFail(reason, line) } },
+            onProgress = { stage ->
+                runOnUiThread {
+                    if (b.loading.visibility == View.VISIBLE) {
+                        b.statusText.text = "${line.name} · $stage"
+                    }
+                }
+            },
         )
         probe = p
         p.start(b.probeHost, line.buildUrl(videoUrl), line.referer, TIMEOUT_MS)
@@ -233,6 +240,6 @@ class PlayerActivity : AppCompatActivity() {
         const val EXTRA_VIDEO_URL = "video_url"
         const val EXTRA_TITLE = "title"
         const val EXTRA_LINE_INDEX = "line_index"
-        private const val TIMEOUT_MS = 30_000L
+        private const val TIMEOUT_MS = 40_000L
     }
 }
